@@ -1,0 +1,396 @@
+/* Soldermask Green & Copper Theme */
+:root {
+    --bg-color: #061109; /* Deep board green */
+    --card-bg: #0b1c11; /* Slightly lighter trace green */
+    --text-color: #a8bba1; /* Muted text */
+    --heading-color: #c87a2c; /* Copper */
+    --accent-color: #00ff66; /* Active LED green */
+    --border-color: #1a3320; /* Dark trace */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    line-height: 1.6;
+    /* CAD/Datasheet Grid Background */
+    background-image: linear-gradient(var(--border-color) 1px, transparent 1px), linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+/* Monospace Headers */
+h1, h2, h3, .project-tech, .location {
+    font-family: 'Courier New', Courier, monospace;
+    text-transform: uppercase;
+}
+
+header {
+    background-color: rgba(11, 28, 17, 0.95);
+    border-bottom: 2px solid var(--heading-color);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+}
+
+.logo {
+    color: var(--accent-color);
+    font-size: 1.3rem;
+    margin: 0;
+    text-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
+}
+
+nav a {
+    color: var(--heading-color);
+    text-decoration: none;
+    margin-left: 1.5rem;
+    font-weight: bold;
+    font-family: 'Courier New', Courier, monospace;
+    transition: color 0.2s;
+}
+
+    nav a:hover {
+        color: var(--accent-color);
+    }
+
+.hero {
+    position: relative;
+    padding: 6rem 2rem;
+    text-align: center;
+    background: radial-gradient(circle at center, rgba(11,28,17,0.8) 0%, rgba(6,17,9,0.9) 100%);
+    border-bottom: 2px solid var(--border-color);
+    overflow: hidden;
+}
+
+    .hero h2 {
+        font-size: 3rem;
+        color: var(--heading-color);
+        margin-bottom: 0.5rem;
+        letter-spacing: 2px;
+    }
+
+.tagline {
+    font-size: 1.2rem;
+    color: #ffffff;
+}
+
+.location {
+    font-size: 0.9rem;
+    color: var(--accent-color);
+    margin-bottom: 2rem;
+}
+
+.btn {
+    background-color: var(--heading-color);
+    color: #000;
+    padding: 0.6rem 1.2rem;
+    text-decoration: none;
+    border-radius: 2px;
+    margin: 0 0.4rem;
+    font-weight: 600;
+    font-family: 'Courier New', Courier, monospace;
+    display: inline-block;
+    transition: all 0.2s ease;
+}
+
+    .btn:hover {
+        background-color: var(--accent-color);
+        box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+    }
+
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--heading-color);
+    color: var(--heading-color);
+}
+
+    .btn-outline:hover {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+        background-color: transparent;
+    }
+
+/* Animations - Drone Container */
+.drone-container {
+    position: absolute;
+    top: 20px;
+    width: 120px;
+    height: 100px;
+    animation: patrolDrone 12s ease-in-out infinite;
+    z-index: 10;
+}
+
+.rotor {
+    stroke: #ffffff;
+    stroke-width: 2;
+    animation: spinRotor 0.1s linear infinite;
+    transform-origin: center;
+}
+
+.rotor-back {
+    stroke: #aaaaaa;
+}
+
+.scanner-beam {
+    fill: rgba(0, 255, 102, 0.15);
+    animation: scanPulse 2s infinite alternate;
+}
+
+/* Complex Flight Path: Panning + Bobbing + Banking (Centered Fix) */
+@keyframes patrolDrone {
+    0% {
+        left: 10%;
+        transform: translateX(-50%) translateY(0px) rotate(6deg);
+    }
+
+    12% {
+        transform: translateX(-50%) translateY(15px) rotate(4deg);
+    }
+
+    25% {
+        left: 50%;
+        transform: translateX(-50%) translateY(-5px) rotate(2deg);
+    }
+
+    37% {
+        transform: translateX(-50%) translateY(15px) rotate(0deg);
+    }
+
+    50% {
+        left: 85%;
+        transform: translateX(-50%) translateY(0px) rotate(-6deg);
+    }
+
+    62% {
+        transform: translateX(-50%) translateY(15px) rotate(-4deg);
+    }
+
+    75% {
+        left: 50%;
+        transform: translateX(-50%) translateY(-5px) rotate(-2deg);
+    }
+
+    87% {
+        transform: translateX(-50%) translateY(15px) rotate(0deg);
+    }
+
+    100% {
+        left: 10%;
+        transform: translateX(-50%) translateY(0px) rotate(6deg);
+    }
+}
+
+@keyframes spinRotor {
+    0% {
+        stroke-dasharray: 2 4;
+        stroke-dashoffset: 0;
+    }
+
+    100% {
+        stroke-dasharray: 2 4;
+        stroke-dashoffset: 6;
+    }
+}
+
+@keyframes scanPulse {
+    0% {
+        opacity: 0.3;
+    }
+
+    100% {
+        opacity: 0.8;
+    }
+}
+
+/* Animations - ECG to PWM Waveform */
+.waveform-container {
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    width: 100%;
+    height: 120px;
+    opacity: 0.6;
+}
+
+.scope-trace {
+    fill: none;
+    stroke: var(--accent-color);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawWave 4s linear infinite;
+    filter: drop-shadow(0 0 5px rgba(0, 255, 102, 0.6));
+}
+
+.scope-dot {
+    offset-path: path('M 0 50 L 50 50 L 60 30 L 70 70 L 85 10 L 100 90 L 115 50 L 160 50 L 160 20 L 220 20 L 220 80 L 280 80 L 280 20 L 340 20 L 340 80 L 400 80 L 400 20 L 460 20 L 460 50 L 500 50');
+    filter: drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 12px var(--accent-color));
+    animation: traceDot 4s linear infinite;
+}
+
+@keyframes drawWave {
+    0% {
+        stroke-dashoffset: 1000;
+    }
+
+    50% {
+        stroke-dashoffset: 0;
+    }
+
+    100% {
+        stroke-dashoffset: -1000;
+    }
+}
+
+@keyframes traceDot {
+    0% {
+        offset-distance: 0%;
+        opacity: 1;
+    }
+
+    49% {
+        opacity: 1;
+    }
+
+    50% {
+        offset-distance: 100%;
+        opacity: 0;
+    }
+
+    100% {
+        offset-distance: 100%;
+        opacity: 0;
+    }
+}
+
+.section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    background-color: rgba(6, 17, 9, 0.85);
+}
+
+    .section h2 {
+        color: var(--heading-color);
+        border-bottom: 2px dashed var(--border-color);
+        padding-bottom: 0.5rem;
+    }
+
+.project-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.project-card, .skill-category {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--heading-color);
+    border-radius: 2px;
+    padding: 1.5rem;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+    .project-card:hover, .skill-category:hover {
+        transform: translateY(-3px);
+        border-left-color: var(--accent-color);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .project-card h3, .skill-category h3 {
+        margin-top: 0;
+        color: #ffffff;
+    }
+
+.project-tech {
+    font-size: 0.85rem;
+    color: var(--accent-color);
+    margin-bottom: 10px;
+}
+
+.skills-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+}
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    background-color: #040a06;
+    color: var(--accent-color);
+    border-top: 1px solid var(--heading-color);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+    footer a {
+        color: var(--accent-color);
+        text-decoration: none;
+    }
+
+/* --- Single Project Page Additions --- */
+
+.project-details h3 {
+    color: var(--accent-color);
+    margin-top: 2.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.project-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px dashed var(--heading-color);
+}
+
+.project-media {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    margin: 1.5rem 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    display: block;
+}
+
+.code-block {
+    background-color: #020503;
+    border-left: 3px solid var(--accent-color);
+    padding: 1.5rem;
+    overflow-x: auto;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+}
+
+.video-container {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    height: 0;
+    overflow: hidden;
+    margin: 1.5rem 0;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+}
+
+    .video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daniel Rushakoff | Electrical Engineer</title>
+    <link rel="stylesheet" href="style-v2.css">
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .tech-pill {
+            background: rgba(255, 165, 0, 0.1);
+            border: 1px solid #FFA500;
+            color: #FFA500;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-family: monospace;
+            transition: all 0.2s ease-in-out;
+            cursor: default;
+        }
+
+            .tech-pill:hover {
+                background: rgba(0, 255, 102, 0.15);
+                border-color: #00ff66;
+                color: #00ff66;
+                transform: translateY(-2px);
+                box-shadow: 0 0 8px rgba(0, 255, 102, 0.4);
+            }
+
+        .project-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+
+            .project-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 6px 20px rgba(0, 255, 102, 0.15);
+                border-color: #00ff66;
+            }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #00ff66;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px #00ff66;
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 8px #00ff66;
+            }
+
+            50% {
+                opacity: 0.3;
+                box-shadow: 0 0 2px #00ff66;
+            }
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation Header -->
+    <header>
+        <div class="nav-container">
+            <h1 class="logo">DANIEL RUSHAKOFF</h1>
+            <nav>
+                <a href="#about">ABOUT</a>
+                <a href="#projects">PROJECTS</a>
+                <a href="#skills">SKILLS</a>
+                <a href="#education">EDUCATION</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+
+        <!-- Hovering Quadcopter Animation -->
+        <div class="drone-container">
+            <svg class="drone" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <!-- Back Arms & Rotors (Slightly smaller/higher for 3D depth) -->
+                <path d="M 25 8 L 40 20 M 75 8 L 60 20" stroke="#a05d1e" stroke-width="2" />
+                <line x1="15" y1="8" x2="35" y2="8" class="rotor rotor-back" />
+                <line x1="65" y1="8" x2="85" y2="8" class="rotor rotor-back" />
+
+                <!-- Main Body -->
+                <rect x="35" y="15" width="30" height="12" rx="3" fill="#c87a2c" />
+
+                <!-- Front Arms & Rotors -->
+                <path d="M 15 15 L 35 22 M 85 15 L 65 22" stroke="#c87a2c" stroke-width="2.5" />
+                <line x1="5" y1="15" x2="25" y2="15" class="rotor" />
+                <line x1="75" y1="15" x2="95" y2="15" class="rotor" />
+
+                <!-- Camera/Sensor & Mapping Beam -->
+                <circle cx="50" cy="30" r="4" fill="#00ff66" />
+                <polygon points="50,34 10,150 90,150" class="scanner-beam" />
+            </svg>
+        </div>
+
+        <div class="hero-content">
+            <h2 style="font-family: monospace;">ELECTRICAL ENGINEER<span style="animation: blink 1s step-end infinite;">|</span></h2>
+            <p class="tagline">B.S. EE | Mixed-Signal Design | Embedded Systems & Controls</p>
+            <p class="location"><span class="status-dot"></span>LOC: Redondo Beach, CA | STATUS: US Citizen | CLEARANCE: Eligible</p>
+
+            <div class="hero-buttons">
+                <a href="Daniel Rushakoff Resume.pdf" target="_blank" class="btn" style="background-color: #FFA500; color: #111; font-weight: bold; box-shadow: 0 0 12px rgba(255, 165, 0, 0.6);">📄 DOWNLOAD RESUME</a>
+                <a href="https://linkedin.com/in/daniel-rushakoff" target="_blank" class="btn btn-outline">LINKEDIN</a>
+                <a href="https://portfolium.com/DanielRushakoff" target="_blank" class="btn btn-outline">PORTFOLIUM</a>
+                <a href="mailto:dzrushakoff@cpp.edu" class="btn btn-outline">EMAIL ME</a>
+            </div>
+        </div>
+
+        <!-- Animated ECG to PWM Waveform -->
+        <div class="waveform-container">
+            <svg class="waveform" viewBox="0 0 500 100" preserveAspectRatio="none">
+                <!-- The Phosphor Trail -->
+                <path class="scope-trace" d="M 0 50 L 50 50 L 60 30 L 70 70 L 85 10 L 100 90 L 115 50 L 160 50 L 160 20 L 220 20 L 220 80 L 280 80 L 280 20 L 340 20 L 340 80 L 400 80 L 400 20 L 460 20 L 460 50 L 500 50" />
+                <!-- The Electron Beam Dot -->
+                <circle class="scope-dot" r="4" fill="#ffffff" />
+            </svg>
+        </div>
+
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section">
+        <h2>ABOUT</h2>
+        <p>
+            I'm an electrical engineer who likes owning every stage of it: the sensor, the analog front end, the firmware, the filtering, and the wireless link that carries the data home. I graduated from Cal Poly Pomona with a B.S. in Electrical Engineering in December 2025 (3.66 GPA, Dean's and President's Honor Lists), after earning my associate degree in General Science with honors at Santa Monica College.
+        </p>
+
+        <p>
+            You can see it in every project below, each one prototyped and verified at the bench. For a semi-autonomous environmental-sensing UAV, I engineered a custom mixed-signal PCB, developed dual-camera terrain navigation, and built a ruggedized perfboard interface for flight. My wireless ECG monitor relies on a 60 Hz notch filter I designed by pole-zero placement in MATLAB; the interference traced back to a wall-powered laptop, and most of it vanished once the system ran on battery. Two wireless closed-loop systems, a PID-controlled 25,000 RPM motor and an LDR-driven LED dimmer, each have a LabVIEW console I built. And a PIC18F fan controller runs on bare-metal I2C, SPI, ADC, UART, and IR drivers I wrote myself.
+        </p>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="section">
+        <h2>PROJECTS</h2>
+        <div class="project-grid">
+
+            <div class="project-card">
+                <h3>Semi-Autonomous Environmental Sensing UAV</h3>
+                <p class="project-tech">[Raspberry Pi 5] [MCP3008 ADC] [Custom PCB] [I2C/SPI]</p>
+                <ul>
+                    <li>Engineered a custom mixed-signal PCB integrating MQ-2, MiCS-5524, and BME280 sensors with a high-precision ADC to establish an I2C data pipeline.</li>
+                    <li>Developed dual-camera optical terrain navigation for real-time path planning, architecting a roadmap for YOLO computer vision via NVIDIA Jetson.</li>
+                    <li>Fabricated a ruggedized perfboard interface using point-to-point routing to withstand flight stress.</li>
+                </ul>
+                <a href="project-uav-v2.html" class="btn btn-outline" style="margin-top: 15px; display: inline-block;">VIEW FULL PROJECT</a>
+            </div>
+
+            <div class="project-card">
+                <h3>Wireless ECG Heartbeat Monitoring System</h3>
+                <p class="project-tech">[AD8232] [MAX30102] [C++] [DSP]</p>
+                <ul>
+                    <li>Designed an analog dual-sensor biomedical circuit to acquire real-time ECG and SpO2 telemetry data.</li>
+                    <li>Implemented C++ DSP filtering algorithms to eliminate 60Hz ambient noise and motion artifacts for arrhythmia detection.</li>
+                </ul>
+                <a href="project-ecg.html" class="btn btn-outline" style="margin-top: 15px; display: inline-block;">VIEW FULL PROJECT</a>
+            </div>
+
+            <div class="project-card">
+                <h3>Wireless PID Motor Control & Telemetry System</h3>
+                <p class="project-tech">[Arduino Uno R4] [nRF24L01+] [LabVIEW] [L293D]</p>
+                <ul>
+                    <li>Architected a closed-loop motor control system actuating a 25,000 RPM DC motor via an L293D H-Bridge driver.</li>
+                    <li>Developed a discrete PID algorithm with anti-windup (50ms rate) processing 8.3 kHz optical encoder pulses.</li>
+                    <li>Engineered a custom LabVIEW GUI to command setpoints and continuously monitor live RF telemetry from I2C/ADC sensors.</li>
+                </ul>
+                <a href="project-pid.html" class="btn btn-outline" style="margin-top: 15px; display: inline-block;">VIEW FULL PROJECT</a>
+            </div>
+
+            <div class="project-card">
+                <h3>Wireless LDR Intensity Control System</h3>
+                <p class="project-tech">[SPI Protocol] [LabVIEW GUI] [nRF24L01+] [LDO]</p>
+                <ul>
+                    <li>Designed a closed-loop SPI communication system using Arduinos and stabilized nRF24L01+ transceivers.</li>
+                    <li>Developed a 9600-baud LabVIEW GUI mapping telemetry to discrete LED dimmer levels while monitoring LCD status outputs.</li>
+                </ul>
+                <a href="project-ldr.html" class="btn btn-outline" style="margin-top: 15px; display: inline-block;">VIEW FULL PROJECT</a>
+            </div>
+
+            <div class="project-card">
+                <h3>PIC18F Environmental & PWM Fan Control System</h3>
+                <p class="project-tech">[PIC18F MCU] [Bare-Metal Firmware] [MPLAB X IDE] [C & MPASM] [I2C/SPI]</p>
+                <ul>
+                    <li>Engineered a PIC18F4620 embedded system in C with bare-metal firmware drivers (I2C, SPI, ADC, UART, NEC IR) for closed-loop DS1621 thermal PWM fan control, timer-based RPM tachometer tracking, hardware interrupts, DS3231 RTC scheduling, and live ST7735 TFT GUI updates.</li>
+                </ul>
+                <a href="project-fan.html" class="btn btn-outline" style="margin-top: 15px; display: inline-block;">VIEW FULL PROJECT</a>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Skills Section -->
+    <section id="skills" class="section">
+        <h2>SKILLS</h2>
+        <div class="skills-container">
+            <div class="skill-category">
+                <h3>FIRMWARE & SOFTWARE</h3>
+                <div class="tag-cloud">
+                    <span class="tech-pill">C</span> <span class="tech-pill">C++</span> <span class="tech-pill">Python</span>
+                    <span class="tech-pill">PIC Assembly (MPASM)</span> <span class="tech-pill">MATLAB</span> <span class="tech-pill">Verilog</span>
+                </div>
+            </div>
+            <div class="skill-category">
+                <h3>PROTOCOLS & HARDWARE</h3>
+                <div class="tag-cloud">
+                    <span class="tech-pill">Arduino</span> <span class="tech-pill">PIC</span> <span class="tech-pill">Raspberry Pi</span>
+                    <span class="tech-pill">FPGA</span> <span class="tech-pill">UART</span> <span class="tech-pill">I2C</span>
+                    <span class="tech-pill">SPI</span> <span class="tech-pill">PWM</span> <span class="tech-pill">ADC/DAC</span>
+                </div>
+            </div>
+            <div class="skill-category">
+                <h3>EDA & TOOLCHAINS</h3>
+                <div class="tag-cloud">
+                    <span class="tech-pill">Altium</span> <span class="tech-pill">KiCad</span> <span class="tech-pill">LTspice</span>
+                    <span class="tech-pill">PSpice</span> <span class="tech-pill">Cadence OrCAD</span> <span class="tech-pill">LabVIEW</span>
+                    <span class="tech-pill">MPLAB X IDE</span> <span class="tech-pill">Simulink</span>
+                </div>
+            </div>
+            <div class="skill-category">
+                <h3>RELEVANT COURSEWORK</h3>
+                <div class="tag-cloud">
+                    <span class="tech-pill">Control Systems</span> <span class="tech-pill">DSP</span> <span class="tech-pill">Signals & Systems</span>
+                    <span class="tech-pill">Power Electronics</span> <span class="tech-pill">Microelectronic Devices & Circuits</span>
+                    <span class="tech-pill">VLSI Design</span> <span class="tech-pill">Microcontrollers</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Education Section -->
+    <section id="education" class="section">
+        <h2>EDUCATION</h2>
+        <div class="project-grid">
+            <div class="project-card">
+                <h3>Cal Poly Pomona</h3>
+                <p class="project-tech">B.S. ELECTRICAL ENGINEERING | DEC 2025</p>
+                <p>GPA: 3.66 | Dean's and President's Honor Lists | IEEE Student Member</p>
+            </div>
+            <div class="project-card">
+                <h3>Santa Monica College</h3>
+                <p class="project-tech">A.A. GENERAL SCIENCE | AUG 2023</p>
+                <p>Dean's Honor List | Graduated with Honors</p>
+            </div>
+        </div>
+    </section>
+
+    <footer id="contact">
+        <p>Email: <a href="mailto:dzrushakoff@cpp.edu">dzrushakoff@cpp.edu</a> | Phone: (310) 292-3714</p>
+        <p>© 2026 Daniel Rushakoff. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,185 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireless LDR Intensity Control | Daniel Rushakoff</title>
+    <link rel="stylesheet" href="style-v2.css">
+
+    <!-- Fixes the scroll offset and adds smooth scrolling -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        h3, h4 {
+            scroll-margin-top: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <h1 class="logo">DANIEL RUSHAKOFF</h1>
+            <nav>
+                <a href="index.html">← BACK TO HOME</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="section project-details">
+
+        <div class="project-header">
+            <h2>WIRELESS LDR INTENSITY CONTROL SYSTEM</h2>
+            <p class="project-tech">Light-Dependent Resistor (LDR) | RF Telemetry | LabVIEW</p>
+            <p class="project-tech">C/C++ Firmware | Embedded Hardware</p>
+        </div>
+
+        <!-- QUICK NAVIGATION MENU -->
+        <div class="quick-nav" style="padding: 15px; margin-bottom: 25px; text-align: center; border: 1px dashed #FFA500; background-color: transparent;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em; color: #FFA500; letter-spacing: 1px;">QUICK NAVIGATION</p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+                <a href="#photos" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ Photos ]</a>
+                <a href="#overview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 1. Overview & Objectives ]</a>
+                <a href="#components" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 2. Required Components ]</a>
+                <a href="#wiring-diagram" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 3. Wiring Diagram ]</a>
+                <a href="#labview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 4. LabVIEW Interface ]</a>
+                <a href="#code" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 5. Code (Transmitter & Receiver) ]</a>
+                <a href="#video" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 6. Video ]</a>
+                <a href="#documentation" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 7. Documentation ]</a>
+            </div>
+        </div>
+
+        <!-- PHOTOS (At the very top) -->
+        <h3 id="photos">Hardware Photos</h3>
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">RECEIVER HARDWARE (VIEW 1)</p>
+                <img src="Receiver Photo 1.jpg" alt="Receiver Hardware Setup 1" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">RECEIVER HARDWARE (VIEW 2)</p>
+                <img src="Receiver Photo 2.jpg" alt="Receiver Hardware Setup 2" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+        </div>
+
+        <h3 id="overview">1. Overview & Objectives</h3>
+        <p>This project involved designing a wireless control system that measures ambient light intensity via a Light-Dependent Resistor (LDR) on a transmitter node, and relays that data via RF to a receiver node. The receiver scales the data to modulate the brightness of an LED while communicating real-time telemetry to a custom LabVIEW dashboard.</p>
+
+        <h3 id="components">2. Required Components</h3>
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">TRANSMITTER COMPONENTS</p>
+                <img src="Transmitter Components.png" alt="Transmitter Components" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">RECEIVER COMPONENTS</p>
+                <img src="Receiver Components.png" alt="Receiver Components" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+        </div>
+
+        <h3 id="wiring-diagram">3. Wiring Diagram</h3>
+        <p>Circuit schematics outlining the sensor integration, RF modules, and microcontroller connections for the system.</p>
+        <img src="LDR Lab 7 Wiring Diagram.png" alt="LDR Wiring Diagram" class="project-media">
+
+        <h3 id="labview">4. LabVIEW Interface</h3>
+        <p>Custom LabVIEW VI designed to capture the serial telemetry data, parse the payload, and visually chart the real-time light intensity values.</p>
+
+        <h4 style="color: #FFA500;">LabVIEW Front Panel</h4>
+        <img src="Lab 7 Front Panel Photo .png" alt="LabVIEW Front Panel" class="project-media">
+
+        <h4 style="color: #FFA500;">LabVIEW Block Diagram</h4>
+        <img src="Lab 7 Block Diagram.png" alt="LabVIEW Block Diagram" class="project-media">
+
+        <h3 id="code">5. Code (Transmitter and Receiver)</h3>
+
+        <h4 style="color: #FFA500;">Receiver Code (Arduino IDE)</h4>
+        <p>The receiver node logic processes the incoming RF payload and drives the LED PWM output. Below are direct captures of the deployed sketch.</p>
+        <img src="Lab 7 Code Part 1.png" alt="Receiver Code Part 1" class="project-media" style="margin-bottom: 15px;">
+        <img src="Lab 7 Code Part 2.png" alt="Receiver Code Part 2" class="project-media" style="margin-bottom: 15px;">
+        <img src="Lab 7 Code Part 3.png" alt="Receiver Code Part 3" class="project-media">
+
+        <h4 style="color: #FFA500;">Transmitter Code (Lab Report Draft)</h4>
+        <p>Draft sketch for the transmitter node responsible for reading the analog LDR data and broadcasting it via the nRF24L01+ transceiver.</p>
+        <pre class="code-block"><code>// ---------------------------------------------------------------- //
+//           ECE3709L LDR TRANSMITTER - LAB REPORT CODE             //
+// ---------------------------------------------------------------- //
+#include &lt;SPI.h&gt;
+#include &lt;RF24.h&gt;
+#include &lt;Wire.h&gt;
+#include &lt;LiquidCrystal_I2C.h&gt;
+
+// ---- Hardware mapping ----
+const int PIN_LDR = A0;
+const uint8_t RF_CE_TX = 7; // CE
+const uint8_t RF_CSN_TX = 8; // CSN
+
+// I2C LCD: try 0x27 first; change to 0x3F if needed
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+RF24 radio(RF_CE_TX, RF_CSN_TX);
+
+// 5-byte pipe address (Must match RX)
+const byte pipeAddr[6] = "ABCD"; // Changed from "L7TX1" to match your Receiver
+
+void setup() {
+  // LCD
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0,0); lcd.print("LDR Wireless TX");
+  lcd.setCursor(0,1); lcd.print("Init...");
+
+  // RF
+  radio.begin();
+  // Slower rate improves range/robustness in labs
+  radio.setDataRate(RF24_250KBPS);
+  radio.setRetries(5, 15); // delay,count
+  radio.openWritingPipe(pipeAddr);
+  radio.stopListening(); // TX role
+  delay(400);
+  lcd.setCursor(0,1); lcd.print("Ready"); 
+}
+
+void loop() {
+  int raw = analogRead(PIN_LDR); // 0..1023
+  uint8_t level = raw / 100; // ~0..10 compact
+
+  // Display
+  lcd.setCursor(0,0); lcd.print("LDR: "); 
+  lcd.setCursor(5,0); lcd.print((int)level);
+  lcd.setCursor(0,1); lcd.print("Send: "); 
+  lcd.setCursor(6,1); lcd.print((int)level);
+
+  // Transmit one byte
+  radio.write(&level, sizeof(level));
+  delay(100);
+}
+// Note: Remember to replace any < or > brackets with &lt; and &gt; 
+
+</code></pre>
+
+        <h3 id="video">6. Video</h3>
+        <p>Real-time demonstration of the LDR signal transmission and system responsiveness.</p>
+
+        <h4 style="color: #FFA500;">Wireless LDR Control Demonstration</h4>
+        <div class="video-container">
+            <!-- Replace the src with your actual YouTube embed link -->
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/HXi38H6gha4" title="Wireless LDR Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <h3 id="documentation">7. Documentation</h3>
+        <p>Review the full laboratory guidelines, technical clarifications, and final reports.</p>
+        <ul class="doc-links" style="display: flex; flex-direction: column; gap: 10px;">
+            <li><a href="ECE3709L-Lab7-New.pdf" target="_blank" class="btn">📄 Download Lab Report (PDF)</a></li>
+            <li><a href="Lab 7-Clarifications.pdf" target="_blank" class="btn">📄 Download Lab Report Clarifications (PDF)</a></li>
+        </ul>
+
+    </section>
+
+    <footer id="contact">
+        <p>Email: <a href="mailto:dzrushakoff@cpp.edu">dzrushakoff@cpp.edu</a> | Phone: (310) 292-3714</p>
+        <p>© 2026 Daniel Rushakoff. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>

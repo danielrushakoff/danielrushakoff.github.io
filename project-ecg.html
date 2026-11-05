@@ -1,0 +1,470 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Monitoring Project | Daniel Rushakoff</title>
+    <link rel="stylesheet" href="style-v2.css">
+
+    <!-- Fixes the scroll offset and adds smooth scrolling -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        h3 {
+            scroll-margin-top: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <h1 class="logo">DANIEL RUSHAKOFF</h1>
+            <nav>
+                <a href="index.html">← BACK TO HOME</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="section project-details">
+
+        <div class="project-header">
+            <h2>WIRELESS ECG HEARTBEAT MONITORING SYSTEM</h2>
+            <p class="project-tech">Dual-Sensor Biomedical System | AD8232 & MAX30102</p>
+            <p class="project-tech">C++ DSP Filtering | Embedded Hardware</p>
+        </div>
+
+        <!-- QUICK NAVIGATION MENU -->
+        <div class="quick-nav" style="padding: 15px; margin-bottom: 25px; text-align: center; border: 1px dashed #FFA500; background-color: transparent;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em; color: #FFA500; letter-spacing: 1px;">QUICK NAVIGATION</p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+                <a href="#photos" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ Photos ]</a>
+                <a href="#overview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 1. Project Overview & Objectives ]</a>
+                <a href="#architecture" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 2. System Architecture / Block Diagram ]</a>
+                <a href="#iot-code" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 3. Wireless IoT Firmware ]</a>
+                <a href="#dsp-code" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 4. DSP Filter Code ]</a>
+                <a href="#videos" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 5. Videos ]</a>
+                <a href="#documentation" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 6. Documentation ]</a>
+            </div>
+        </div>
+
+        <!-- PHOTOS (At the very top) -->
+        <h3 id="photos">Hardware Photos</h3>
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+            <img src="ECG Project 2.jpg" alt="ECG Hardware Setup #1" class="project-media" style="width: 48%; margin: 0; object-fit: cover; border-radius: 8px;">
+            <img src="ECG Project 1.jpg" alt="ECG Hardware Setup #2" class="project-media" style="width: 48%; margin: 0; object-fit: cover; border-radius: 8px;">
+        </div>
+
+        <h3 id="overview">1. Project Overview & Objectives</h3>
+        <p>I engineered a dual-sensor biomedical system utilizing an AD8232 for ECG data acquisition and a MAX30102 for pulse oximetry. The primary objective was to capture and monitor the live ECG P-QRS-T waveform accurately. To resolve critical 60 Hz AC mains interference disrupting the signal from wall power, I implemented custom C++ DSP algorithms to aggressively filter the noise while preserving high-frequency cardiac signal components.</p>
+
+        <h3 id="architecture">2. System Architecture / Block Diagram</h3>
+        <p>The system routes analog biomedical signals through a high-precision sampling pipeline, utilizing a hardware timer to maintain a strict 1 kHz sampling rate to guarantee DSP filter performance before telemetry processing.</p>
+        <img src="ECG Project Block Diagrams.jpg" alt="ECG System Block Diagram" class="project-media">
+
+        <h3 id="iot-code">3. Wireless IoT Firmware (Battery Powered)</h3>
+        <p>After migrating the Arduino Uno R4 WiFi to a 9V battery power supply, the 60 Hz AC mains interference was eliminated. This finalized firmware integrates both the AD8232 and MAX30102 sensors wirelessly, transmitting live telemetry directly to the Arduino IoT Cloud Dashboard without the need for the DSP filter.</p>
+
+        <pre class="code-block"><code>#include &lt;Wire.h&gt;
+#include "MAX30105.h"
+#include "heartRate.h"
+#include "spo2_algorithm.h"
+#include "ArduinoIoTCloud.h"
+#include "Arduino_ConnectionHandler.h"
+
+// ==========================================
+//             WIFI CREDENTIALS
+// ==========================================
+const char SSID[] = "Daniel's S25 Ultra";
+const char PASS[] = "Password123$";
+
+WiFiConnectionHandler ArduinoIoTPreferredConnection(SSID, PASS);
+
+// ==========================================
+//          AD8232 (ECG) VARIABLES
+// ==========================================
+// Cloud Variables (ECG)
+int ecg_signal; 
+int bpm_value; 
+
+// --- TUNING DASHBOARD ---
+const int PRINT_SPEED = 50; 
+float THRESHOLD = 500.0; 
+const int MIN_TIME_BETWEEN_BEATS = 350;
+
+// --- CRITICAL FIX: RESTORE STABILITY ---
+const int BEATS_TO_AVERAGE = 15;
+
+const int PIN_LO_POS = 2; 
+const int PIN_LO_NEG = 3; 
+const int PIN_ECG    = A0; 
+
+float inByte = 0;
+int ecg_BPM = 0; 
+int beat_old = 0;
+float beats[50]; 
+int beatIndex = 0;
+boolean belowThreshold = true;
+
+unsigned long lastPrintTime = 0;
+int peakValueInWindow = 0; 
+
+// ==========================================
+//        MAX30102 (SPO2) VARIABLES
+// ==========================================
+// Cloud Variables (MAX)
+int cloudBPM;
+int cloudAvgBPM;
+int cloudSpO2;
+int cloudStatus;
+float cloudIR;
+int smoothingFactor = 5;
+bool cloudBeat = false;
+
+MAX30105 particleSensor;
+
+const byte RATE_SIZE = 4; 
+byte rates[RATE_SIZE];
+byte rateSpot = 0;
+long lastBeat = 0;
+float max_BPM; 
+int beatAvg;
+
+// SpO2 Buffers
+const int BUFFER_LENGTH = 50;
+uint32_t irBuffer[BUFFER_LENGTH];
+uint32_t redBuffer[BUFFER_LENGTH];
+int bufferIndex = 0;
+
+int32_t spo2 = 0;
+int8_t spo2Valid = 0;
+int32_t spo2HR = 0;
+int8_t spo2HRValid = 0;
+
+unsigned long lastCloudUpdate = 0;
+const unsigned long cloudInterval = 100;
+
+// ==========================================
+//           CLOUD SETUP
+// ==========================================
+void initProperties() {
+  ArduinoCloud.setThingId("c7dffcd2-d023-40e1-89c5-f99026f33736");
+
+  ArduinoCloud.addProperty(ecg_signal, READ, ON_CHANGE); 
+  ArduinoCloud.addProperty(bpm_value, READ, ON_CHANGE);   
+  ArduinoCloud.addProperty(cloudAvgBPM, READ, ON_CHANGE); 
+  ArduinoCloud.addProperty(cloudIR, READ, ON_CHANGE);     
+  ArduinoCloud.addProperty(cloudSpO2, READ, ON_CHANGE);   
+}
+
+// ==========================================
+//                SETUP
+// ==========================================
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+
+  // 1. Initialize Cloud
+  initProperties();
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  setDebugMessageLevel(0); 
+  
+  // 2. Hardware Setup: ECG
+  pinMode(PIN_LO_POS, INPUT);
+  pinMode(PIN_LO_NEG, INPUT);
+  analogReadResolution(10); 
+
+  // 3. Hardware Setup: MAX30102
+  if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+    Serial.println("MAX30102 not found. Check wiring.");
+    while (1); 
+  }
+
+  // MAX30102 Settings (Low Power / High Speed)
+  byte ledBrightness = 0x1F; 
+  byte sampleAverage = 4;    
+  byte ledMode = 2;          
+  int sampleRate = 400;      
+  int pulseWidth = 411;      
+  int adcRange = 4096;       
+  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
+
+  Serial.println("System Ready.");
+
+  // 4. SYNC FIX: Fast-forward clock to avoid initial glitch
+  beat_old = millis();
+}
+
+// ==========================================
+//                  LOOP
+// ==========================================
+void loop() {
+  
+  // ==========================================
+  //      TASK 1: ECG LOGIC (Priority)
+  // ==========================================
+  if((digitalRead(PIN_LO_POS) == 1) || (digitalRead(PIN_LO_NEG) == 1)){
+    // Leads off
+    peakValueInWindow = 512; 
+    belowThreshold = true;
+    beatIndex = 0; 
+    ecg_BPM = 0;
+    
+    // Reset buffer
+    for(int i=0; i&lt;BEATS_TO_AVERAGE; i++) beats[i] = 0;
+    beat_old = millis(); 
+  }
+  else{
+    inByte = analogRead(PIN_ECG);
+    
+    // Peak Hold
+    if (inByte &gt; peakValueInWindow) {
+      peakValueInWindow = inByte;
+    }
+    
+    // BPM Math
+    if (inByte &gt; THRESHOLD && belowThreshold == true) {
+      calculateECGBPM(); 
+      belowThreshold = false;
+    }
+    else if(inByte &lt; THRESHOLD) {
+      belowThreshold = true; 
+    }
+  }
+
+  // ==========================================
+  //      TASK 2: MAX30102 LOGIC
+  // ==========================================
+  // We check this AFTER the ECG to ensure ECG gets first dibs on the loop start
+  long irValue  = particleSensor.getIR();
+  long redValue = particleSensor.getRed();
+
+  if (irValue &gt; 50000) { 
+    irBuffer[bufferIndex]  = (uint32_t)irValue;
+    redBuffer[bufferIndex] = (uint32_t)redValue;
+    bufferIndex++;
+
+    if (bufferIndex &gt;= BUFFER_LENGTH) {
+      // WARNING: This function takes time! 
+      // The ECG might miss a few milliseconds here, but the 
+      // Average=15 setting will hide the glitch.
+      maxim_heart_rate_and_oxygen_saturation(
+        irBuffer, BUFFER_LENGTH, redBuffer,
+        &spo2, &spo2Valid, &spo2HR, &spo2HRValid
+      );
+      bufferIndex = 0;
+    }
+
+    if (checkForBeat(irValue) == true) {
+      long delta = millis() - lastBeat;
+      lastBeat = millis();
+      max_BPM = 60 / (delta / 1000.0);
+
+      if (max_BPM &lt; 255 && max_BPM &gt; 20) {
+        rates[rateSpot++] = (byte)max_BPM;
+        rateSpot %= RATE_SIZE;
+        if (beatAvg &lt; 20) {
+           for(byte x=0; x&lt;RATE_SIZE; x++) rates[x] = (byte)max_BPM;
+        }
+        long sum = 0;
+        for (byte x = 0; x &lt; RATE_SIZE; x++) sum += rates[x];
+        beatAvg = sum / RATE_SIZE;
+      }
+      cloudBeat = true; 
+    }
+    if (cloudBeat && millis() - lastBeat &gt; 100) {
+      cloudBeat = false;
+    }
+  } 
+  else {
+    beatAvg = 0;
+    max_BPM = 0;
+    spo2 = 0;
+    for(byte x=0; x&lt;RATE_SIZE; x++) rates[x] = 0;
+  }
+
+  // ==========================================
+  //      TASK 3: CLOUD & SERIAL UPDATES
+  // ==========================================
+  
+  // We use ONE timer for the update to reduce overhead.
+  if (millis() - lastPrintTime &gt;= PRINT_SPEED) {
+    lastPrintTime = millis();
+    
+    // Update Variables
+    ecg_signal = peakValueInWindow;
+    bpm_value = ecg_BPM;
+    
+    // Only update MAX variables occasionally to save variables
+    cloudBPM = (int)max_BPM;
+    cloudAvgBPM = beatAvg;
+    cloudIR = irValue;
+    cloudSpO2 = (spo2Valid == 1) ? spo2 : 0;
+
+    // --- SERIAL PLOTTER ---
+    Serial.print("ECG:");
+    Serial.print(peakValueInWindow);      
+    Serial.print(",");
+    Serial.print("ECG_BPM:");
+    Serial.print(ecg_BPM);   
+    Serial.print(",");
+    Serial.print("MAX_IR:");
+    Serial.print(irValue);     
+    Serial.print(",");
+    Serial.print("MAX_BPM:");
+    Serial.println(beatAvg);  
+
+    peakValueInWindow = inByte; 
+    
+    // SINGLE CLOUD UPDATE
+    // Doing this once every 50ms is cleaner than multiple random checks
+    ArduinoCloud.update(); 
+  }
+}
+
+// ==========================================
+//          HELPER FUNCTIONS
+// ==========================================
+
+void calculateECGBPM () {  
+  int beat_new = millis(); 
+  int diff = beat_new - beat_old; 
+  
+  if (diff &gt; MIN_TIME_BETWEEN_BEATS) {
+    float currentBPM = 60000.0 / diff; 
+    
+    if (currentBPM &gt; 30 && currentBPM &lt; 220) {
+      beats[beatIndex] = currentBPM; 
+      
+      // If startup, fill array instantly
+      if (ecg_BPM &lt; 20) {
+         for(int i=0; i&lt;BEATS_TO_AVERAGE; i++) beats[i] = currentBPM;
+      }
+      
+      float total = 0.0;
+      for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++){
+        total += beats[i];
+      }
+      
+      ecg_BPM = int(total / BEATS_TO_AVERAGE);
+      beat_old = beat_new;
+      beatIndex = (beatIndex + 1) % BEATS_TO_AVERAGE; 
+    }
+    else if (diff &gt; 2500) { 
+       beat_old = beat_new;
+    }
+  }
+}</code></pre>
+
+        <h3 id="dsp-code">4. DSP Filter Code (Wired Configuration)</h3>
+        <p>During the initial wired testing phase, the system was powered via a 5V USB connection to a laptop plugged into a wall outlet, which introduced significant 60 Hz AC noise. To target the exact 60 Hz interference without applying a broad low-pass filter that would attenuate the QRS complex, I designed a second-order IIR Biquad Notch Filter. The filter was modeled in MATLAB with zeros placed on the unit circle at 60 Hz in the z-plane, then converted into the C++ difference equation below for real-time sample processing.</p>
+
+        <pre class="code-block"><code>// NotchFilter.h
+//
+// Second-order IIR notch (band-stop) filter for removing narrowband
+// interference -- e.g. 60 Hz AC mains pickup from powerlines/outlets --
+// from a sampled signal such as ECG.
+//
+// This is the standard "cookbook" biquad notch (Robert Bristow-Johnson's
+// Audio EQ Cookbook design, adapted for biosignal use). One biquad
+// section, Direct Form I, float math -- 5 multiplies and 4 adds per
+// sample, cheap enough to run every sample on a Cortex-M/ESP32-class MCU.
+//
+// Usage:
+//   NotchFilter notch(1000.0f, 60.0f, 30.0f);  // fs=1000Hz, f0=60Hz, Q=30
+//   float clean = notch.process(rawSample);
+//
+// If your mains frequency is 50 Hz instead of 60 Hz (most countries
+// outside the US), just pass 50.0f for notchFreqHz.
+
+#pragma once
+#include &lt;cmath&gt;
+
+class NotchFilter {
+public:
+    using sample_t = float;
+
+    // sampleRateHz : your ADC sample rate
+    // notchFreqHz  : frequency to reject (60.0 for US mains, 50.0 elsewhere)
+    // Q            : quality factor. Bandwidth of the notch ~= f0/Q.
+    //                Higher Q -> narrower notch, less distortion to
+    //                nearby signal content, but less tolerant of mains
+    //                frequency drift. 20-35 is a good range for ECG.
+    NotchFilter(sample_t sampleRateHz, sample_t notchFreqHz = 60.0f, sample_t Q = 30.0f) {
+        configure(sampleRateHz, notchFreqHz, Q);
+    }
+
+    // Recompute coefficients. Call if fs, target frequency, or Q change
+    // at runtime.
+    void configure(sample_t sampleRateHz, sample_t notchFreqHz, sample_t Q) {
+        const sample_t w0 = 2.0f * static_cast&lt;sample_t&gt;(M_PI) * notchFreqHz / sampleRateHz;
+        const sample_t alpha = std::sin(w0) / (2.0f * Q);
+        const sample_t cosw0 = std::cos(w0);
+
+        const sample_t a0 = 1.0f + alpha;
+        b0_ = 1.0f / a0;
+        b1_ = -2.0f * cosw0 / a0;
+        b2_ = 1.0f / a0;
+        a1_ = -2.0f * cosw0 / a0;
+        a2_ = (1.0f - alpha) / a0;
+
+        reset();
+    }
+
+    // Clears filter history (e.g. after a signal dropout/lead-off event).
+    void reset() {
+        x1_ = x2_ = y1_ = y2_ = 0.0f;
+    }
+
+    // Call once per incoming sample; returns the filtered sample.
+    sample_t process(sample_t x) {
+        const sample_t y = b0_ * x + b1_ * x1_ + b2_ * x2_ - a1_ * y1_ - a2_ * y2_;
+        x2_ = x1_;
+        x1_ = x;
+        y2_ = y1_;
+        y1_ = y;
+        return y;
+    }
+
+private:
+    sample_t b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0;
+    sample_t x1_ = 0, x2_ = 0, y1_ = 0, y2_ = 0;
+};</code></pre>
+
+        <h3 id="videos">5. Videos</h3>
+        <p>Live demonstrations of the ECG output before and after applying the DSP Notch Filter.</p>
+
+        <!-- YOUTUBE VIDEOS -->
+        <h4>Wireless Arduino-Based ECG and Heartbeat Monitoring Healthcare System</h4>
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/UqmQ4C-j6g8" title="Wireless Arduino-Based ECG and Heartbeat Monitoring Healthcare System" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <h4>Testing AD8232 Heart Rate Monitor - 3 ECG Leads</h4>
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/I-evFNQ-OhM" title="Testing AD8232 Heart Rate Monitor - 3 ECG Leads" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <h4>ECG Signal on Arduino IDE Serial Plotter</h4>
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/sr7niT1gKsQ" title="ECG Signal on Arduino IDE Serial Plotter" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <h3 id="documentation">6. Documentation</h3>
+        <p>Review the full system schematics, MATLAB filter design plots, and DSP performance matrices.</p>
+        <ul class="doc-links">
+            <li><a href="ECG and AD8232 Project Report Paper.pdf" target="_blank" class="btn">📄 Download ECG & Healthcare Monitoring System IEEE Report (PDF)</a></li>
+            <li><a href="ECG and AD8232 Project Slides.pdf" target="_blank" class="btn">📊 View ECG & Healthcare Monitoring System Slideshow</a></li>
+        </ul>
+
+    </section>
+
+    <footer id="contact">
+        <p>Email: <a href="mailto:dzrushakoff@cpp.edu">dzrushakoff@cpp.edu</a> | Phone: (310) 292-3714</p>
+        <p>© 2026 Daniel Rushakoff. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,476 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireless PID Motor Control | Daniel Rushakoff</title>
+    <link rel="stylesheet" href="style-v2.css">
+
+    <!-- Fixes the scroll offset and adds smooth scrolling -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        h3, h4 {
+            scroll-margin-top: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <h1 class="logo">DANIEL RUSHAKOFF</h1>
+            <nav>
+                <a href="index.html">← BACK TO HOME</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="section project-details">
+
+        <div class="project-header">
+            <h2>WIRELESS PID MOTOR CONTROL & TELEMETRY SYSTEM</h2>
+            <p class="project-tech">Closed-Loop Control System | C/C++ Firmware | KiCad | LabVIEW</p>
+            <p class="project-tech">RF Telemetry | Embedded Hardware</p>
+        </div>
+
+        <!-- QUICK NAVIGATION MENU -->
+        <div class="quick-nav" style="padding: 15px; margin-bottom: 25px; text-align: center; border: 1px dashed #FFA500; background-color: transparent;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em; color: #FFA500; letter-spacing: 1px;">QUICK NAVIGATION</p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+                <a href="#photos" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ Photos ]</a>
+                <a href="#overview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 1. Overview & Objectives ]</a>
+                <a href="#wiring-diagrams" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 2. Wiring Diagrams (KiCad) ]</a>
+                <a href="#architecture" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 3. System Architecture ]</a>
+                <a href="#labview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 4. LabVIEW Interface ]</a>
+                <a href="#code" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 5. Transmitter & Receiver Code ]</a>
+                <a href="#documentation" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 6. Documentation ]</a>
+            </div>
+        </div>
+
+        <!-- PHOTOS (At the very top) -->
+        <h3 id="photos">Hardware Photos</h3>
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+
+            <!-- Transmitter Container -->
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">TRANSMITTER HARDWARE</p>
+                <img src="Transmitter Photo.jpg" alt="Transmitter Hardware Setup" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+
+            <!-- Receiver Container -->
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">RECEIVER HARDWARE</p>
+                <img src="Receiver Photo.jpg" alt="Receiver Hardware Setup" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+
+        </div>
+
+        <h3 id="overview">1. Overview & Objectives</h3>
+        <p>This project demonstrates a closed-loop wireless motor control system utilizing a custom-tuned PID algorithm. The objective was to design a robust transmitter and receiver architecture capable of eliminating steady-state error and preventing integral windup during continuous motor operation, while relaying real-time telemetry data to a custom LabVIEW GUI for monitoring and analysis.</p>
+
+        <h3 id="wiring-diagrams">2. Wiring Diagrams (KiCad)</h3>
+        <p>Breadboard schematics engineered in KiCad for both the transmitting and receiving nodes.</p>
+
+        <h4 style="color: #FFA500;">Transmitter Wiring Diagram</h4>
+        <img src="Transmitter KiCad Schematic.png" alt="Transmitter KiCad Diagram" class="project-media">
+
+        <h4 style="color: #FFA500;">Receiver Wiring Diagram</h4>
+        <img src="Receiver KiCad Schematic.png" alt="Receiver KiCad Diagram" class="project-media">
+
+        <h3 id="architecture">3. System Architecture / Block Diagram</h3>
+        <p>A comprehensive overview of the wireless data pipeline, power distribution, and closed-loop feedback mechanisms.</p>
+        <img src="System Block Diagram.png" alt="PID System Block Diagram" class="project-media">
+
+        <h3 id="labview">4. LabVIEW Front Panel & Block Diagram</h3>
+        <p>I engineered a custom LabVIEW interface to monitor real-time telemetry, visualizing encoder feedback, PWM duty cycle, and system setpoints.</p>
+
+        <h4 style="color: #FFA500;">LabVIEW Front Panel</h4>
+        <img src="Front Panel .png" alt="LabVIEW Front Panel" class="project-media">
+
+        <h4 style="color: #FFA500;">LabVIEW Block Diagram</h4>
+        <img src="Block Diagram .png" alt="LabVIEW Block Diagram" class="project-media">
+
+        <h3 id="code">5. Code (Transmitter and Receiver)</h3>
+        <p>The C++ firmware powering the MCUs, featuring precise hardware timer interrupts, the PID control loop with anti-windup logic, and the RF payload formatting.</p>
+
+        <h4 style="color: #FFA500;">Transmitter Code</h4>
+        <pre class="code-block"><code>// ---------------------------------------------------------------- //
+    //           ECE3709L PID TRANSMITTER - LABVIEW & TX SIDE           //
+    // ---------------------------------------------------------------- //
+    #include &lt;SPI.h&gt;
+    #include &lt;RF24.h&gt;
+    #include &lt;Wire.h&gt;
+    #include &lt;LiquidCrystal_I2C.h&gt;
+
+    // -------------------- Pin Definitions --------------------
+    #define CE_PIN 9
+    #define CSN_PIN 10
+
+    // -------------------- LCD Setup --------------------
+    LiquidCrystal_I2C lcd(0x27, 16, 2); // 16x2 I2C LCD
+
+    // -------------------- RF24 Setup --------------------
+    RF24 radio(CE_PIN, CSN_PIN);
+    const byte address[6] = "3Node"; // 5-byte address
+
+    // -------------------- Global Variables --------------------
+    char cmdBuf[16]; // Matched to receiver's 16-byte payload buffer
+
+    // -------------------- Setup --------------------
+    void setup() {
+      // Initialize Serial for LabVIEW communication
+      Serial.begin(9600);
+      while (!Serial);
+      Serial.println("TX: Serial initialized");
+
+      // Initialize LCD
+      lcd.init();
+      lcd.backlight();
+      lcd.setCursor(0, 0);
+      lcd.print("TX Ready");
+      lcd.setCursor(0, 1);
+      lcd.print("Waiting cmd...");
+
+      // Initialize NRF24
+      if (!radio.begin()) {
+        Serial.println("TX: RF module failed");
+        lcd.setCursor(0, 1);
+        lcd.print("RF FAIL        ");
+        while (1); // halt
+      }
+      radio.setPALevel(RF24_PA_LOW);       // Lab distance, avoid noise
+      radio.setDataRate(RF24_1MBPS);       // Reliable default
+      radio.openWritingPipe(address);
+      radio.stopListening();               // Transmitter mode
+      Serial.println("TX: RF Ready");
+    }
+
+    // -------------------- Main Loop --------------------
+    void loop() {
+      // Check if data is available from LabVIEW GUI
+      if (Serial.available()) {
+        int len = Serial.readBytesUntil('\n', cmdBuf, sizeof(cmdBuf) - 1);
+        cmdBuf[len] = '\0'; // Null-terminate the string
+
+        // Convert to String for easier parsing and uppercase formatting
+        String cmdStr = String(cmdBuf);
+        cmdStr.trim();
+        cmdStr.toUpperCase();
+        cmdStr.toCharArray(cmdBuf, sizeof(cmdBuf));
+
+        // Determine if command is valid for the PID Receiver
+        bool validCmd = false;
+        if (cmdStr == "FWD" || cmdStr == "REV" || cmdStr == "STOP" ||
+            cmdStr == "PID:ON" || cmdStr == "PID:OFF" || cmdStr.startsWith("SET:")) {
+            validCmd = true;
+        }
+
+        if (!validCmd) {
+          Serial.print("TX: Bad cmd '");
+          Serial.print(cmdBuf);
+          Serial.println("'");
+          lcd.setCursor(0, 1);
+          lcd.print("BAD CMD        ");
+          return;
+        }
+
+        // Update LCD Output
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("TX: ");
+
+        if (cmdStr.startsWith("SET:")) {
+          lcd.print("SET RPM");
+          lcd.setCursor(0, 1);
+          lcd.print(cmdStr.substring(4)); // Display just the target RPM number
+        } else {
+          lcd.print(cmdStr); // Display FWD, STOP, PID:ON, etc.
+        }
+
+        // Transmit via RF to Motor Node
+        bool ok = radio.write(cmdBuf, sizeof(cmdBuf));
+        if (ok) {
+          Serial.print("TX: Sent '");
+          Serial.print(cmdBuf);
+          Serial.println("'");
+        } else {
+          Serial.print("TX: Failed '");
+          Serial.print(cmdBuf);
+          Serial.println("'");
+          lcd.setCursor(0, 1);
+          lcd.print("TX FAIL        ");
+        }
+
+        delay(50); // Small debounce for RF stability
+      }
+    }
+    // Note: Remember to replace any < or > brackets with &lt; and &gt;
+    // For example: #include &lt;Wire.h&gt;
+
+    </code></pre>
+
+        <h4 style="color: #FFA500;">Receiver Code</h4>
+        <pre class="code-block"><code>// ---------------------------------------------------------------- //
+    //           ECE3709L PID RECEIVER - MOTOR & SENSOR SIDE            //
+    // ---------------------------------------------------------------- //
+    #include &lt;SPI.h&gt;
+    #include &lt;RF24.h&gt;
+    #include &lt;Wire.h&gt;
+    #include &lt;LiquidCrystal_I2C.h&gt;
+
+    // -------------------- PIN DEFINITIONS --------------------
+    // NOTE: Motor pins moved to 4 & 5 to free up Pin 2 for the Sensor Interrupt!
+    const uint8_t CE_PIN  = 7;
+    const uint8_t CSN_PIN = 8;
+    const uint8_t EN1_PIN = 9;  // PWM Enable
+    const uint8_t IN1_PIN = 4;  // CHANGED from 3
+    const uint8_t IN2_PIN = 5;  // CHANGED from 2
+
+    // PID Sensor (LM393 Optical Encoder)
+    const uint8_t SPEED_SENSOR_PIN = 2; // Must be Pin 2 or 3 for interrupts
+
+    // -------------------- GLOBAL VARIABLES --------------------
+    RF24 radio(CE_PIN, CSN_PIN);
+    LiquidCrystal_I2C lcd(0x27, 20, 4);
+    const byte address[6] = "3Node";
+    char payload[16]; // Increased buffer slightly for longer commands
+
+    // --- PID CONSTANTS (Tune these!) ---
+    // See Lab Manual Section 9.A.1 [cite: 321]
+    double Kp = 2.0;   // Proportional gain
+    double Ki = 0.5;   // Integral gain
+    double Kd = 0.1;   // Derivative gain
+
+    // --- PID VARIABLES ---
+    bool pidEnabled = false;       // Manual Mode by default [cite: 121]
+    double setpointRPM = 0;        // Desired Speed
+    double currentRPM = 0;         // Measured Speed (Process Variable)
+    double pwmOutput = 0;          // Control Output (0-255)
+    double previousError = 0;
+    double integral = 0;
+    unsigned long lastPIDTime = 0;
+    const int PID_INTERVAL = 100;  // 100ms Sampling Loop [cite: 181]
+
+    // --- SPEED MEASUREMENT VARIABLES ---
+    volatile unsigned long pulseCount = 0; // "volatile" because it changes in interrupt
+    const int ENCODER_SLOTS = 20;          // Standard encoder disk slots [cite: 288]
+
+    // -------------------- INTERRUPT ROUTINE --------------------
+    // This function runs automatically every time the sensor sees a slot
+    void countPulse() {
+      pulseCount++;
+    }
+
+    // -------------------- MOTOR FUNCTIONS --------------------
+    void motorDrive(int pwm, bool reverse) {
+      // Constrain PWM to safe limits
+      pwm = constrain(pwm, 0, 255);
+
+      if (pwm == 0) {
+        digitalWrite(IN1_PIN, LOW);
+        digitalWrite(IN2_PIN, LOW);
+        analogWrite(EN1_PIN, 0);
+      } else if (!reverse) {
+        digitalWrite(IN1_PIN, HIGH);
+        digitalWrite(IN2_PIN, LOW);
+        analogWrite(EN1_PIN, pwm);
+      } else {
+        digitalWrite(IN1_PIN, LOW);
+        digitalWrite(IN2_PIN, HIGH);
+        analogWrite(EN1_PIN, pwm);
+      }
+    }
+
+    // -------------------- SETUP --------------------
+    void setup() {
+      Serial.begin(9600);
+
+      // 1. Init Pins
+      pinMode(IN1_PIN, OUTPUT);
+      pinMode(IN2_PIN, OUTPUT);
+      pinMode(EN1_PIN, OUTPUT);
+      pinMode(SPEED_SENSOR_PIN, INPUT_PULLUP); // Sensor Input
+
+      // 2. Attach Interrupt for RPM Counting [cite: 292]
+      attachInterrupt(digitalPinToInterrupt(SPEED_SENSOR_PIN), countPulse, RISING);
+
+      // 3. Init LCD
+      Wire.begin();
+      lcd.init();
+      lcd.backlight();
+      lcd.setCursor(0,0);
+      lcd.print("PID System Init");
+
+      // 4. Init Radio
+      if (!radio.begin()) {
+        lcd.setCursor(0,1);
+        lcd.print("Radio Fail");
+        while(1);
+      }
+      radio.setPALevel(RF24_PA_LOW);
+      radio.setDataRate(RF24_1MBPS);
+      radio.openReadingPipe(0, address);
+      radio.startListening();
+
+      // Flush buffer
+      delay(100);
+      while(radio.available()) {
+        char junk[8];
+        radio.read(&junk, sizeof(junk));
+      }
+    }
+
+    // -------------------- MAIN LOOP --------------------
+    void loop() {
+      unsigned long currentTime = millis();
+
+      // --- A. READ WIRELESS COMMANDS ---
+      if (radio.available()) {
+        memset(payload, 0, sizeof(payload));
+        radio.read(payload, sizeof(payload));
+
+        String cmd = String(payload);
+        cmd.trim();
+        cmd.toUpperCase();
+
+        if (cmd.length() > 0) {
+          Serial.print("RX: "); Serial.println(cmd);
+          parseCommand(cmd); // Handle FWD, PID, SET, etc.
+        }
+      }
+
+      // --- B. RUN PID LOOP (Time-Based) ---
+      if (currentTime - lastPIDTime >= PID_INTERVAL) {
+        // 1. Calculate RPM from pulses
+        // RPM = (Pulses / Slots) * (60000ms / Interval_ms)
+        // We disable interrupts briefly to read the volatile variable safely
+        noInterrupts();
+        unsigned long pulses = pulseCount;
+        pulseCount = 0; // Reset counter for next interval
+        interrupts();
+
+        currentRPM = (float(pulses) / ENCODER_SLOTS) * (60000.0 / PID_INTERVAL);
+
+        // 2. Compute Output
+        if (pidEnabled) {
+          pwmOutput = computePID(setpointRPM, currentRPM);
+        }
+        // If Manual Mode, pwmOutput is set directly by commands (parsing section)
+
+        // 3. Drive Motor
+        // Note: Direction is handled by global state or assumed FWD for PID in this lab
+        motorDrive((int)pwmOutput, false);
+
+        // 4. Update Display
+        updateLCD();
+
+        lastPIDTime = currentTime;
+      }
+    }
+
+    // -------------------- PID CALCULATION --------------------
+    double computePID(double setpoint, double measured) {
+      // [cite: 201] Calculate Error
+      double error = setpoint - measured;
+
+      // [cite: 202] Proportional Term
+      double P = Kp * error;
+
+      // [cite: 203] Integral Term (with Anti-Windup)
+      integral += error * (PID_INTERVAL / 1000.0);
+
+      // Anti-Windup: Stop growing integral if we are already maxed out [cite: 371]
+      if (integral > 255) integral = 255;
+      if (integral < -255) integral = -255;
+
+      double I = Ki * integral;
+
+      // [cite: 205] Derivative Term
+      // D = Kd * (error - previousError) / dt
+      double derivative = (error - previousError) / (PID_INTERVAL / 1000.0);
+      double D = Kd * derivative;
+
+      previousError = error;
+
+      // [cite: 207] Total Output
+      double output = P + I + D;
+
+      // [cite: 208] Constrain output
+      return constrain(output, 0, 255);
+    }
+
+    // -------------------- COMMAND PARSING --------------------
+    void parseCommand(String cmd) {
+      // Manual Commands
+      if (cmd == "STOP") {
+        pidEnabled = false;
+        pwmOutput = 0;
+        setpointRPM = 0;
+        integral = 0; // Reset accumulated error
+      }
+      else if (cmd == "FWD") {
+        pidEnabled = false;
+        pwmOutput = 200; // Default manual speed
+      }
+      else if (cmd == "REV") {
+        pidEnabled = false;
+        // For PID lab, we usually only control speed in FWD, but this allows basic check
+        motorDrive(200, true);
+      }
+
+      // PID Commands (Format: "SET:1500" or "PID:ON")
+      else if (cmd.startsWith("SET:")) {
+        // Extract number after ":"
+        setpointRPM = cmd.substring(4).toInt();
+        Serial.print("Setpoint Updated: "); Serial.println(setpointRPM);
+      }
+      else if (cmd == "PID:ON") {
+        pidEnabled = true;
+        integral = 0; // Reset integral on fresh start
+      }
+      else if (cmd == "PID:OFF") {
+        pidEnabled = false;
+        pwmOutput = 0;
+      }
+    }
+
+    // -------------------- LCD DISPLAY --------------------
+    void updateLCD() {
+      lcd.setCursor(0, 0);
+      if (pidEnabled) lcd.print("Mode: PID   ");
+      else            lcd.print("Mode: MANUAL");
+
+      lcd.setCursor(0, 1);
+      lcd.print("Set:");
+      lcd.print((int)setpointRPM);
+      lcd.print(" RPM:");
+      lcd.print((int)currentRPM); // Display Feedback [cite: 215]
+
+      lcd.setCursor(0, 2); // 20x4 LCD has rows 2 & 3
+      lcd.print("PWM: ");
+      lcd.print((int)pwmOutput);
+    }
+    // Note: Remember to replace any < or > brackets with &lt; and &gt;
+
+    </code></pre>
+
+        <h3 id="documentation">6. Documentation</h3>
+        <p>Review the full system schematics, PID tuning calculations, and performance metrics.</p>
+        <ul class="doc-links" style="display: flex; flex-direction: column; gap: 10px;">
+            <li><a href="PID Control.pdf" target="_blank" class="btn">📄 Download PID Control Instructions (PDF)</a></li>
+            <li><a href="ECE3709L-Final Lab.pdf" target="_blank" class="btn">📄 Download Lab Instructions (PDF)</a></li>
+            <li><a href="lab 9 report.pdf" target="_blank" class="btn">📄 Download Lab Report (PDF)</a></li>
+        </ul>
+
+    </section>
+
+        <footer id="contact">
+            <p>Email: <a href="mailto:dzrushakoff@cpp.edu">dzrushakoff@cpp.edu</a> | Phone: (310) 292-3714</p>
+            <p>© 2026 Daniel Rushakoff. All Rights Reserved.</p>
+        </footer>
+
+    </body>
+    </html>

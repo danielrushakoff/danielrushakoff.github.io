@@ -1,0 +1,355 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIC18F Environmental & PWM Fan Control System | Daniel Rushakoff</title>
+    <link rel="stylesheet" href="style-v2.css">
+
+    <!-- Fixes the scroll offset and adds smooth scrolling -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        h3, h4 {
+            scroll-margin-top: 100px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <h1 class="logo">DANIEL RUSHAKOFF</h1>
+            <nav>
+                <a href="index.html">← BACK TO HOME</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="section project-details">
+
+        <div class="project-header">
+            <h2>PIC18F ENVIRONMENTAL & PWM FAN CONTROL SYSTEM</h2>
+            <p class="project-tech">PIC18F4620 MCU | C Firmware (MPLAB X) | I2C & SPI | PWM & ADC</p>
+            <p class="project-tech">Hardware Interrupts | IR Decoding | ST7735 TFT Display</p>
+        </div>
+
+        <!-- QUICK NAVIGATION MENU -->
+        <div class="quick-nav" style="padding: 15px; margin-bottom: 25px; text-align: center; border: 1px dashed #FFA500; background-color: transparent;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 1.1em; color: #FFA500; letter-spacing: 1px;">QUICK NAVIGATION</p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+                <a href="#photos" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ Photos ]</a>
+                <a href="#overview" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 1. Overview & Objectives ]</a>
+                <a href="#wiring-diagram" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 2. Wiring Diagram / Schematics ]</a>
+                <a href="#code" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 3. Firmware & Modular Code ]</a>
+                <a href="#video" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 4. Video Demonstration ]</a>
+                <a href="#documentation" style="text-decoration: none; color: #00FF00; font-weight: bold;">[ 5. Documentation ]</a>
+            </div>
+        </div>
+
+        <!-- PHOTOS (At the very top) -->
+        <h3 id="photos">Hardware Photos</h3>
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">HARDWARE SETUP (VIEW 1)</p>
+                <img src="PIC18F Lab Photo.jpg" alt="PIC18F4620 Hardware Setup 1" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+            <div style="width: 48%; text-align: center;">
+                <p style="font-weight: bold; color: #FFA500; margin: 0 0 10px 0; letter-spacing: 1px;">TFT DISPLAY (VIEW 2)</p>
+                <img src="TFT Photo.jpg" alt="PIC18F4620 Hardware Setup 2" class="project-media" style="width: 100%; margin: 0; object-fit: cover; border-radius: 8px;">
+            </div>
+        </div>
+
+        <h3 id="overview">1. Overview & Objectives</h3>
+        <p>This embedded systems capstone project integrates multi-protocol peripheral interfacing, hardware interrupts, and real-time PWM actuation on a PIC18F4620 microcontroller programmed in C. The system functions as an automated environmental and timing controller with a live graphical user interface rendered on an ST7735 TFT LCD via SPI and real-time UART serial telemetry output to TeraTerm.</p>
+        <p><strong>Key System Capabilities & Objectives:</strong></p>
+        <ul>
+            <li><strong>Dual-Trigger System Activation:</strong> Engineered the system power state to toggle cleanly between standby ("SYSTEM OFF") and active monitoring via either an external hardware push-button interrupt (<code>INT0</code>) or an analog photoresistor light sensor threshold (&gt;3.0V via internal ADC).</li>
+            <li><strong>I2C Environmental & Real-Time Clock Interfacing:</strong> Configured an I2C bus to poll a DS3231 Real-Time Clock (RTC) for time/date tracking and a DS1621 digital thermometer to compute ambient temperatures in both Celsius and Fahrenheit every second.</li>
+            <li><strong>Closed-Loop & Manual PWM Fan Actuation:</strong> Designed dual-mode fan control. In Manual Mode, duty cycle is adjusted directly via remote input. In Automatic Mode, the firmware calculates the thermal differential between ambient temperature and a user-defined target threshold (50°F–110°F), dynamically scaling the PWM duty cycle (<code>diff_temp * 4</code>) to regulate cooling speed.</li>
+            <li><strong>Tachometer RPM Feedback & RGB Status Encoding:</strong> Utilized hardware timer/counter registers (<code>TMR3L</code>) to measure real-time fan rotational speed (RPM) and mapped both PWM duty cycle and RPM ranges to 3-bit color codes across dual RGB LEDs (D1 and D2).</li>
+            <li><strong>NEC Infrared (IR) Remote Decoding & Interactive GUI:</strong> Implemented interrupt-driven NEC IR decoding to navigate multi-screen TFT menus (Main Dashboard, Time/Date Setup, Fan Temp Setup), configure programmable countdown timers (TM1, TM2, TM3), and trigger piezoelectric audio confirmation tones.</li>
+        </ul>
+
+        <h3 id="wiring-diagram">2. Wiring Diagram / Schematics</h3>
+        <p>Complete hardware schematic detailing the PIC18F4620 pinout, I2C/SPI bus lines, MOSFET fan driver circuitry, ADC light sensor divider, and RGB LED port mappings.</p>
+        <img src="ECE3301L_Fall_2024_Session_03_Lab_Final_Schematics-1.png" alt="PIC18F4620 System Schematic" class="project-media">
+
+        <h3 id="code">3. Firmware & Modular Code</h3>
+        <p>The firmware is architected modularly in MPLAB X IDE across dedicated hardware abstraction headers and C source files to separate I2C communication, SPI display rendering, interrupt service routines, and fan control logic.</p>
+
+        <h4 style="color: #FFA500;">Modular Firmware Directory</h4>
+        <img src="Modular Firmware Directory.png" alt="MPLAB X Project File Structure" class="project-media" style="max-width: 600px; margin-bottom: 25px;">
+
+        <h4 style="color: #FFA500;">Main System Firmware (Lab_13_Main.c)</h4>
+        <pre class="code-block"><code>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;xc.h&gt;
+#include &lt;math.h&gt;
+#include &lt;p18f4620.h&gt;
+#include &lt;usart.h&gt;
+#include &lt;string.h&gt;
+
+#include "I2C.h"
+#include "I2C_Support.h"
+#include "Interrupt.h"
+#include "Fan_Support.h"
+#include "Main.h"
+#include "ST7735_TFT.h"
+#include "utils.h"
+#include "Main_Screen.h"
+#include "Setup_Time.h"
+#include "Setup_Fan_Temp.h"
+
+#pragma config OSC = INTIO67
+#pragma config BOREN =OFF
+#pragma config WDT=OFF
+#pragma config LVP=OFF
+
+void Set_D1_RGB(char);
+void Set_D2_RGB(int);
+void test_alarm();
+
+char second = 0x00;
+char minute = 0x00;
+char hour = 0x00;
+char dow = 0x00;
+char day = 0x00;
+char month = 0x00;
+char year = 0x00;
+
+char found;
+char tempSecond = 0xff; 
+signed char tempC, tempF;
+char setup_second, setup_minute, setup_hour, setup_day, setup_month, setup_year;
+
+unsigned char fan_set_temp = 16;
+unsigned char Nec_state = 0;
+float volt;
+char INT0_flag, INT1_flag, INT2_flag;
+char light_flag;
+
+short Nec_ok = 0;
+char Nec_Button;
+char FAN;
+char duty_cycle;
+int rps;
+int rpm;
+
+char FANMODE = 0;
+char FAN_TIMER_MODE = 0;
+char FAN_TIMER_TIME = 0;
+char SYSTEM_ON = 0;
+
+char buffer[35]     = "                      \0";
+char *nbr;
+char *txt;
+char tempC_Txt[]    = "+25";
+char tempF_Txt[]    = "+077";
+char time_Txt[]     = "00:00:00";
+char date_Txt[]     = "00/00/00";
+char Fan_Timer_Mode_Txt[] = "OFF";
+char Fan_Timer_Txt[] = "000";
+char Fan_Set_Temp_Txt[] = "77F";
+char Fan_Mode_Txt[]  = "MANU";              // text storage for Fan Mode
+char Fan_SW_Txt[]   = "OFF";                // text storage for Fan On/Off
+
+    
+char DC_Txt[]       = "000";                // text storage for Duty Cycle value
+char Volt_Txt[]     = "0.00V";
+char RTC_ALARM_Txt[]= "0";                  //
+char RPM_Txt[]      = "0000";               // text storage for RPM
+
+char setup_time[]       = "00:00:00";
+char setup_date[]       = "01/01/00";
+
+char setup_fan_set_text[]   = "077F";
+
+
+
+void Do_Init()                      // Initialize the ports 
+{ 
+    Init_UART();                    // Initialize the uart
+    Init_ADC();
+    OSCCON=0x70;                    // Set oscillator to 8 MHz 
+    
+    ADCON1= 0x0E;
+    TRISA = 0x03;
+    TRISB = 0x07;
+    TRISC = 0x01;
+    TRISD = 0x00;
+    TRISE = 0x00;
+    PORTE = 0x00;
+
+    FAN = 0;
+    RBPU =0;
+
+    I2C_Init(100000); 
+
+    DS1621_Init();
+    Init_Interrupt();
+    duty_cycle = 50;
+    Turn_Off_Fan();
+    fan_set_temp = 77;
+}
+
+
+void main() 
+{
+    Do_Init();                                                  // Initialization 
+
+    Initialize_Screen();
+    
+    TMR3L = 0x00;                   
+    T3CON = 0x03;
+
+    Deactivate_Buzzer();
+
+    tempSecond = 0xff;
+    
+    while (1)
+    {
+        DS3231_Read_Time();
+
+        if(tempSecond != second)
+        {
+            tempSecond = second;
+            rpm = get_RPM();            
+ 
+
+            volt = Read_Volt(1);
+            if (volt &gt; 3.000) light_flag = 1;
+            tempC = DS1621_Read_Temp();
+            tempF = (tempC * 9 / 5) + 32;
+            Set_D1_RGB(duty_cycle);
+            Set_D2_RGB(rpm);
+            
+            printf ("%02x:%02x:%02x %02x/%02x/%02x",hour,minute,second,month,day,year);
+            printf (" Temp = %d C = %d F ", tempC, tempF);
+            printf ("Light Sensor = %f V", volt);
+            printf (" RPM = %d  dc = %d ls = %d\r\n", rpm, duty_cycle, light_flag);
+            
+            Monitor_Fan();
+
+            Update_Screen();
+        }
+ 
+        // Task #1: Check remote button input when system is active
+        if (check_for_button_input()==1 &amp;&amp; SYSTEM_ON == 1)
+        {
+                printf("Key Location = %d \r\n\n", found);
+                Nec_ok = 0;
+                switch(found)
+                {
+                    case Ch_Minus:
+                        Do_Beep_Good();
+                        Do_Setup_Time();
+                    break;
+                    case Channel:
+                        Do_Beep_Good();
+                        Setup_Fan_Temp();
+                        break;
+                    case Prev:
+                        //Do_Beep_Good();
+                        Do_Change_Fan_Timer_Mode_Minus();
+                        break;
+                    case Next:
+                        //Do_Beep_Good();
+                        Do_Change_Fan_Timer_Mode_Plus();
+                        break;
+                    case Play_Pause:
+                        Do_Beep_Good();
+                        Toggle_Fan();
+                        break;
+                    case Minus:
+                        Do_Beep_Good();
+                        Decrease_Duty_Cycle();
+                        break;
+                    case Plus:
+                        Do_Beep_Good();
+                        Increase_Duty_Cycle();
+                        break;
+                    case EQ:
+                        Do_Beep_Good();
+                        if (FANMODE == 1)
+                            FANMODE = 0;
+                        else
+                            FANMODE = 1;
+                        break;
+                    default:
+                        Do_Beep_Bad();
+                }
+        }
+
+        // Task #2: Handle hardware interrupt (INT0) or light sensor system toggle
+        if (INT0_flag == 1 || light_flag == 1)
+        {
+            INT0_flag = 0;
+            light_flag = 0;
+            
+            if (SYSTEM_ON == 1)
+            {
+                printf ("The system will now turn off. \r\n\n");
+                SYSTEM_ON = 0;
+                Turn_Off_Fan();
+                FAN_TIMER_MODE = 0;
+                FAN_TIMER_TIME = 0;
+                printf ("The system is now OFF. \r\n\n");
+                Initialize_Screen();
+            }
+            else if (SYSTEM_ON == 0)
+            {
+                printf ("The system will now turn on. \r\n\n");
+                SYSTEM_ON = 1;
+                Initialize_Screen();
+            }
+        }
+    }
+}
+
+
+void Set_D1_RGB(char duty_cycle)
+{
+   // RGB D1: Duty Cycle Indicator
+    int range = duty_cycle/10;
+    if (range &gt; 7)
+        range = 7;
+    PORTD = (PORTD &amp; 0x8F) | (range&lt;&lt;4);
+}
+
+void Set_D2_RGB(int rpm)
+{
+   // RGB D2: Fan RPM Indicator
+    int range = (rpm/500)+1;
+    if (range &gt; 7)
+        range = 7;
+    if (rpm == 0)
+        range = 0;
+    PORTE = range;
+}</code></pre>
+
+        <h3 id="video">4. Video Demonstration</h3>
+        <p>Live hardware demonstration showcasing system initialization, IR remote menu navigation, closed-loop temperature fan control, and real-time TFT updates.</p>
+
+        <h4 style="color: #FFA500;">System Operation & PWM Control Demo</h4>
+        <div class="video-container">
+            <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/Ey2kxtp2K14" title="PWM Fan Controller Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+        <h3 id="documentation">5. Documentation</h3>
+        <p>Review the complete final project specifications, register configurations, and hardware design guidelines.</p>
+        <ul class="doc-links" style="display: flex; flex-direction: column; gap: 10px;">
+            <li><a href="ECE3301L_Spring_2024_Session_03_Lab_Final_Handout.pdf" target="_blank" class="btn">📄 Download Final Lab Report Instructions (PDF)</a></li>
+        </ul>
+
+    </section>
+
+    <footer id="contact">
+        <p>Email: <a href="mailto:dzrushakoff@cpp.edu">dzrushakoff@cpp.edu</a> | Phone: (310) 292-3714</p>
+        <p>© 2026 Daniel Rushakoff. All Rights Reserved.</p>
+    </footer>
+
+</body>
+</html>
