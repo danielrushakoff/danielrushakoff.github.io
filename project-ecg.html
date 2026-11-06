@@ -73,12 +73,13 @@
 #include "spo2_algorithm.h"
 #include "ArduinoIoTCloud.h"
 #include "Arduino_ConnectionHandler.h"
+#include &lt;FspTimer.h&gt;
 
 // ==========================================
 //             WIFI CREDENTIALS
 // ==========================================
-const char SSID[] = "Daniel's S25 Ultra";
-const char PASS[] = "Password123$";
+const char SSID[] = "YOUR_WIFI_SSID";
+const char PASS[] = "YOUR_WIFI_PASSWORD";
 
 WiFiConnectionHandler ArduinoIoTPreferredConnection(SSID, PASS);
 
@@ -92,7 +93,7 @@ int bpm_value;
 // --- TUNING DASHBOARD ---
 const int PRINT_SPEED = 50; 
 float THRESHOLD = 500.0; 
-const int MIN_TIME_BETWEEN_BEATS = 350;
+const int MIN_TIME_BETWEEN_BEATS = 275;
 
 // --- CRITICAL FIX: RESTORE STABILITY ---
 const int BEATS_TO_AVERAGE = 15;
@@ -103,13 +104,54 @@ const int PIN_ECG    = A0;
 
 float inByte = 0;
 int ecg_BPM = 0; 
-int beat_old = 0;
+uint32_t beat_old = 0;
+uint32_t prevSampleSeq = 0;
 float beats[50]; 
 int beatIndex = 0;
 boolean belowThreshold = true;
 
 unsigned long lastPrintTime = 0;
 int peakValueInWindow = 0; 
+
+// ==========================================
+//       1 kHz HARDWARE TIMER & BUFFER
+// ==========================================
+FspTimer ecgTimer;
+const uint16_t ECG_BUFFER_SIZE = 512;
+const uint16_t ECG_BUFFER_MASK = ECG_BUFFER_SIZE - 1;
+volatile uint16_t ecgBuffer[ECG_BUFFER_SIZE];
+volatile uint32_t ecgSeqBuffer[ECG_BUFFER_SIZE];
+volatile uint16_t ecgHead = 0;
+volatile uint16_t ecgTail = 0;
+volatile uint32_t isrTickCounter = 0;
+
+void ecgTimerISR(timer_callback_args_t *p_args) {
+  (void)p_args;
+  uint32_t seq = ++isrTickCounter;
+  uint16_t sample = (uint16_t)analogRead(PIN_ECG);
+  uint16_t nextHead = (ecgHead + 1) &amp; ECG_BUFFER_MASK;
+  if (nextHead != ecgTail) {
+    ecgBuffer[ecgHead] = sample;
+    ecgSeqBuffer[ecgHead] = seq;
+    ecgHead = nextHead;
+  }
+}
+
+bool startEcgTimer(float freqHz) {
+  uint8_t timerType = GPT_TIMER;
+  int8_t timerChannel = FspTimer::get_available_timer(timerType);
+  if (timerChannel &lt; 0) {
+    timerType = AGT_TIMER;
+    timerChannel = FspTimer::get_available_timer(timerType);
+  }
+  if (timerChannel &lt; 0) return false;
+
+  if (!ecgTimer.begin(TIMER_MODE_PERIODIC, timerType, (uint8_t)timerChannel, freqHz, 0.0f, ecgTimerISR)) return false;
+  if (!ecgTimer.setup_overflow_irq(12)) return false;
+  if (!ecgTimer.open()) return false;
+  if (!ecgTimer.start()) return false;
+  return true;
+}
 
 // ==========================================
 //        MAX30102 (SPO2) VARIABLES
@@ -125,15 +167,19 @@ bool cloudBeat = false;
 
 MAX30105 particleSensor;
 
+const float MAX_FIFO_RATE_HZ = 25.0f;
 const byte RATE_SIZE = 4; 
 byte rates[RATE_SIZE];
 byte rateSpot = 0;
-long lastBeat = 0;
+uint32_t maxSampleCounter = 0;
+uint32_t lastBeatSample = 0;
 float max_BPM; 
 int beatAvg;
+long irValue = 0;
+long redValue = 0;
 
 // SpO2 Buffers
-const int BUFFER_LENGTH = 50;
+const int BUFFER_LENGTH = 100;
 uint32_t irBuffer[BUFFER_LENGTH];
 uint32_t redBuffer[BUFFER_LENGTH];
 int bufferIndex = 0;
@@ -171,7 +217,7 @@ void setup() {
   ArduinoCloud.begin(ArduinoIoTPreferredConnection);
   setDebugMessageLevel(0); 
   
-  // 2. Hardware Setup: ECG
+  // 2. Hardware Setup: ECG Pins
   pinMode(PIN_LO_POS, INPUT);
   pinMode(PIN_LO_NEG, INPUT);
   analogReadResolution(10); 
@@ -186,15 +232,18 @@ void setup() {
   byte ledBrightness = 0x1F; 
   byte sampleAverage = 4;    
   byte ledMode = 2;          
-  int sampleRate = 400;      
+  int sampleRate = 100;      
   int pulseWidth = 411;      
   int adcRange = 4096;       
   particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
 
-  Serial.println("System Ready.");
+  // 4. Start 1 kHz Hardware Timer
+  if (!startEcgTimer(1000.0f)) {
+    Serial.println("ERROR: Failed to initialize 1 kHz hardware timer.");
+    while (1);
+  }
 
-  // 4. SYNC FIX: Fast-forward clock to avoid initial glitch
-  beat_old = millis();
+  Serial.println("System Ready.");
 }
 
 // ==========================================
@@ -205,91 +254,110 @@ void loop() {
   // ==========================================
   //      TASK 1: ECG LOGIC (Priority)
   // ==========================================
-  if((digitalRead(PIN_LO_POS) == 1) || (digitalRead(PIN_LO_NEG) == 1)){
-    // Leads off
-    peakValueInWindow = 512; 
-    belowThreshold = true;
-    beatIndex = 0; 
-    ecg_BPM = 0;
-    
-    // Reset buffer
-    for(int i=0; i&lt;BEATS_TO_AVERAGE; i++) beats[i] = 0;
-    beat_old = millis(); 
-  }
-  else{
-    inByte = analogRead(PIN_ECG);
-    
-    // Peak Hold
-    if (inByte &gt; peakValueInWindow) {
-      peakValueInWindow = inByte;
+  uint8_t processed = 0;
+  while (ecgTail != ecgHead &amp;&amp; processed &lt; 64) {
+    uint16_t rawSample = ecgBuffer[ecgTail];
+    uint32_t sampleSeq = ecgSeqBuffer[ecgTail];
+    ecgTail = (ecgTail + 1) &amp; ECG_BUFFER_MASK;
+    processed++;
+
+    if (prevSampleSeq != 0 &amp;&amp; sampleSeq != (prevSampleSeq + 1)) {
+      belowThreshold = true;
+      beat_old = sampleSeq;
     }
-    
-    // BPM Math
-    if (inByte &gt; THRESHOLD && belowThreshold == true) {
-      calculateECGBPM(); 
-      belowThreshold = false;
+    prevSampleSeq = sampleSeq;
+
+    if ((digitalRead(PIN_LO_POS) == 1) || (digitalRead(PIN_LO_NEG) == 1)) {
+      // Leads off
+      peakValueInWindow = 512; 
+      belowThreshold = true;
+      beatIndex = 0; 
+      ecg_BPM = 0;
+      
+      // Reset buffer
+      for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++) beats[i] = 0;
+      beat_old = sampleSeq; 
     }
-    else if(inByte &lt; THRESHOLD) {
-      belowThreshold = true; 
+    else {
+      inByte = (float)rawSample;
+      
+      // Peak Hold
+      if (inByte &gt; peakValueInWindow) {
+        peakValueInWindow = (int)inByte;
+      }
+      
+      // BPM Math
+      if (inByte &gt; THRESHOLD &amp;&amp; belowThreshold == true) {
+        calculateECGBPM(sampleSeq); 
+        belowThreshold = false;
+      }
+      else if (inByte &lt; THRESHOLD) {
+        belowThreshold = true; 
+      }
     }
   }
 
   // ==========================================
   //      TASK 2: MAX30102 LOGIC
   // ==========================================
-  // We check this AFTER the ECG to ensure ECG gets first dibs on the loop start
-  long irValue  = particleSensor.getIR();
-  long redValue = particleSensor.getRed();
+  particleSensor.check();
+  while (particleSensor.available()) {
+    redValue = particleSensor.getFIFORed();
+    irValue  = particleSensor.getFIFOIR();
+    particleSensor.nextSample();
+    maxSampleCounter++;
 
-  if (irValue &gt; 50000) { 
-    irBuffer[bufferIndex]  = (uint32_t)irValue;
-    redBuffer[bufferIndex] = (uint32_t)redValue;
-    bufferIndex++;
+    if (irValue &gt; 50000) { 
+      irBuffer[bufferIndex]  = (uint32_t)irValue;
+      redBuffer[bufferIndex] = (uint32_t)redValue;
+      bufferIndex++;
 
-    if (bufferIndex &gt;= BUFFER_LENGTH) {
-      // WARNING: This function takes time! 
-      // The ECG might miss a few milliseconds here, but the 
-      // Average=15 setting will hide the glitch.
-      maxim_heart_rate_and_oxygen_saturation(
-        irBuffer, BUFFER_LENGTH, redBuffer,
-        &spo2, &spo2Valid, &spo2HR, &spo2HRValid
-      );
-      bufferIndex = 0;
-    }
-
-    if (checkForBeat(irValue) == true) {
-      long delta = millis() - lastBeat;
-      lastBeat = millis();
-      max_BPM = 60 / (delta / 1000.0);
-
-      if (max_BPM &lt; 255 && max_BPM &gt; 20) {
-        rates[rateSpot++] = (byte)max_BPM;
-        rateSpot %= RATE_SIZE;
-        if (beatAvg &lt; 20) {
-           for(byte x=0; x&lt;RATE_SIZE; x++) rates[x] = (byte)max_BPM;
-        }
-        long sum = 0;
-        for (byte x = 0; x &lt; RATE_SIZE; x++) sum += rates[x];
-        beatAvg = sum / RATE_SIZE;
+      if (bufferIndex &gt;= BUFFER_LENGTH) {
+        maxim_heart_rate_and_oxygen_saturation(
+          irBuffer, BUFFER_LENGTH, redBuffer,
+          &amp;spo2, &amp;spo2Valid, &amp;spo2HR, &amp;spo2HRValid
+        );
+        bufferIndex = 0;
       }
-      cloudBeat = true; 
+
+      if (checkForBeat(irValue) == true) {
+        uint32_t deltaSamples = maxSampleCounter - lastBeatSample;
+        lastBeatSample = maxSampleCounter;
+
+        if (deltaSamples &gt; 0) {
+          max_BPM = (60.0f * MAX_FIFO_RATE_HZ) / (float)deltaSamples;
+
+          if (max_BPM &lt; 255 &amp;&amp; max_BPM &gt; 20) {
+            rates[rateSpot++] = (byte)max_BPM;
+            rateSpot %= RATE_SIZE;
+            if (beatAvg &lt; 20) {
+               for (byte x = 0; x &lt; RATE_SIZE; x++) rates[x] = (byte)max_BPM;
+            }
+            long sum = 0;
+            for (byte x = 0; x &lt; RATE_SIZE; x++) sum += rates[x];
+            beatAvg = sum / RATE_SIZE;
+          }
+          cloudBeat = true;
+        }
+      }
+      if (cloudBeat &amp;&amp; (maxSampleCounter - lastBeatSample) &gt; 3) {
+        cloudBeat = false;
+      }
+    } 
+    else {
+      beatAvg = 0;
+      max_BPM = 0;
+      spo2 = 0;
+      spo2Valid = 0;
+      bufferIndex = 0;
+      lastBeatSample = maxSampleCounter;
+      for (byte x = 0; x &lt; RATE_SIZE; x++) rates[x] = 0;
     }
-    if (cloudBeat && millis() - lastBeat &gt; 100) {
-      cloudBeat = false;
-    }
-  } 
-  else {
-    beatAvg = 0;
-    max_BPM = 0;
-    spo2 = 0;
-    for(byte x=0; x&lt;RATE_SIZE; x++) rates[x] = 0;
   }
 
   // ==========================================
   //      TASK 3: CLOUD & SERIAL UPDATES
   // ==========================================
-  
-  // We use ONE timer for the update to reduce overhead.
   if (millis() - lastPrintTime &gt;= PRINT_SPEED) {
     lastPrintTime = millis();
     
@@ -297,7 +365,6 @@ void loop() {
     ecg_signal = peakValueInWindow;
     bpm_value = ecg_BPM;
     
-    // Only update MAX variables occasionally to save variables
     cloudBPM = (int)max_BPM;
     cloudAvgBPM = beatAvg;
     cloudIR = irValue;
@@ -316,10 +383,8 @@ void loop() {
     Serial.print("MAX_BPM:");
     Serial.println(beatAvg);  
 
-    peakValueInWindow = inByte; 
+    peakValueInWindow = (int)inByte; 
     
-    // SINGLE CLOUD UPDATE
-    // Doing this once every 50ms is cleaner than multiple random checks
     ArduinoCloud.update(); 
   }
 }
@@ -328,19 +393,22 @@ void loop() {
 //          HELPER FUNCTIONS
 // ==========================================
 
-void calculateECGBPM () {  
-  int beat_new = millis(); 
-  int diff = beat_new - beat_old; 
+void calculateECGBPM (uint32_t beat_new) {  
+  if (beat_old == 0) {
+    beat_old = beat_new;
+    return;
+  }
+
+  uint32_t diff = beat_new - beat_old;
   
   if (diff &gt; MIN_TIME_BETWEEN_BEATS) {
-    float currentBPM = 60000.0 / diff; 
+    float currentBPM = 60000.0f / (float)diff; 
     
-    if (currentBPM &gt; 30 && currentBPM &lt; 220) {
+    if (currentBPM &gt; 30 &amp;&amp; currentBPM &lt; 220) {
       beats[beatIndex] = currentBPM; 
       
-      // If startup, fill array instantly
       if (ecg_BPM &lt; 20) {
-         for(int i=0; i&lt;BEATS_TO_AVERAGE; i++) beats[i] = currentBPM;
+         for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++) beats[i] = currentBPM;
       }
       
       float total = 0.0;
@@ -361,77 +429,416 @@ void calculateECGBPM () {
         <h3 id="dsp-code">4. DSP Filter Code (Wired Configuration)</h3>
         <p>During the initial wired testing phase, the system was powered via a 5V USB connection to a laptop plugged into a wall outlet, which introduced significant 60 Hz AC noise. To target the exact 60 Hz interference without applying a broad low-pass filter that would attenuate the QRS complex, I designed a second-order IIR Biquad Notch Filter. The filter was modeled in MATLAB with zeros placed on the unit circle at 60 Hz in the z-plane, then converted into the C++ difference equation below for real-time sample processing.</p>
 
-        <pre class="code-block"><code>// NotchFilter.h
-//
-// Second-order IIR notch (band-stop) filter for removing narrowband
-// interference -- e.g. 60 Hz AC mains pickup from powerlines/outlets --
-// from a sampled signal such as ECG.
-//
-// This is the standard "cookbook" biquad notch (Robert Bristow-Johnson's
-// Audio EQ Cookbook design, adapted for biosignal use). One biquad
-// section, Direct Form I, float math -- 5 multiplies and 4 adds per
-// sample, cheap enough to run every sample on a Cortex-M/ESP32-class MCU.
-//
-// Usage:
-//   NotchFilter notch(1000.0f, 60.0f, 30.0f);  // fs=1000Hz, f0=60Hz, Q=30
-//   float clean = notch.process(rawSample);
-//
-// If your mains frequency is 50 Hz instead of 60 Hz (most countries
-// outside the US), just pass 50.0f for notchFreqHz.
-
-#pragma once
+        <pre class="code-block"><code>#include &lt;Wire.h&gt;
 #include &lt;cmath&gt;
+#include "MAX30105.h"
+#include "heartRate.h"
+#include "spo2_algorithm.h"
+#include "ArduinoIoTCloud.h"
+#include "Arduino_ConnectionHandler.h"
+#include &lt;FspTimer.h&gt;
 
+// ==========================================
+//       60 Hz IIR BIQUAD NOTCH FILTER
+// ==========================================
 class NotchFilter {
 public:
-    using sample_t = float;
+  using sample_t = float;
 
-    // sampleRateHz : your ADC sample rate
-    // notchFreqHz  : frequency to reject (60.0 for US mains, 50.0 elsewhere)
-    // Q            : quality factor. Bandwidth of the notch ~= f0/Q.
-    //                Higher Q -> narrower notch, less distortion to
-    //                nearby signal content, but less tolerant of mains
-    //                frequency drift. 20-35 is a good range for ECG.
-    NotchFilter(sample_t sampleRateHz, sample_t notchFreqHz = 60.0f, sample_t Q = 30.0f) {
-        configure(sampleRateHz, notchFreqHz, Q);
-    }
+  NotchFilter(sample_t sampleRateHz, sample_t notchFreqHz = 60.0f, sample_t Q = 30.0f) {
+    configure(sampleRateHz, notchFreqHz, Q);
+  }
 
-    // Recompute coefficients. Call if fs, target frequency, or Q change
-    // at runtime.
-    void configure(sample_t sampleRateHz, sample_t notchFreqHz, sample_t Q) {
-        const sample_t w0 = 2.0f * static_cast&lt;sample_t&gt;(M_PI) * notchFreqHz / sampleRateHz;
-        const sample_t alpha = std::sin(w0) / (2.0f * Q);
-        const sample_t cosw0 = std::cos(w0);
+  void configure(sample_t sampleRateHz, sample_t notchFreqHz, sample_t Q) {
+    const sample_t w0 = 2.0f * static_cast&lt;sample_t&gt;(M_PI) * notchFreqHz / sampleRateHz;
+    const sample_t alpha = std::sin(w0) / (2.0f * Q);
+    const sample_t cosw0 = std::cos(w0);
 
-        const sample_t a0 = 1.0f + alpha;
-        b0_ = 1.0f / a0;
-        b1_ = -2.0f * cosw0 / a0;
-        b2_ = 1.0f / a0;
-        a1_ = -2.0f * cosw0 / a0;
-        a2_ = (1.0f - alpha) / a0;
+    const sample_t a0 = 1.0f + alpha;
+    b0_ = 1.0f / a0;
+    b1_ = -2.0f * cosw0 / a0;
+    b2_ = 1.0f / a0;
+    a1_ = -2.0f * cosw0 / a0;
+    a2_ = (1.0f - alpha) / a0;
 
-        reset();
-    }
+    reset();
+  }
 
-    // Clears filter history (e.g. after a signal dropout/lead-off event).
-    void reset() {
-        x1_ = x2_ = y1_ = y2_ = 0.0f;
-    }
+  void reset(sample_t dcBaseline = 310.0f) {
+    x1_ = x2_ = y1_ = y2_ = dcBaseline;
+  }
 
-    // Call once per incoming sample; returns the filtered sample.
-    sample_t process(sample_t x) {
-        const sample_t y = b0_ * x + b1_ * x1_ + b2_ * x2_ - a1_ * y1_ - a2_ * y2_;
-        x2_ = x1_;
-        x1_ = x;
-        y2_ = y1_;
-        y1_ = y;
-        return y;
-    }
+  sample_t process(sample_t x) {
+    const sample_t y = b0_ * x + b1_ * x1_ + b2_ * x2_ - a1_ * y1_ - a2_ * y2_;
+    x2_ = x1_;
+    x1_ = x;
+    y2_ = y1_;
+    y1_ = y;
+    return y;
+  }
 
 private:
-    sample_t b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0;
-    sample_t x1_ = 0, x2_ = 0, y1_ = 0, y2_ = 0;
-};</code></pre>
+  sample_t b0_ = 1, b1_ = 0, b2_ = 0, a1_ = 0, a2_ = 0;
+  sample_t x1_ = 310.0f, x2_ = 310.0f, y1_ = 310.0f, y2_ = 310.0f;
+};
+
+// Instantiate 60 Hz Notch Filter (fs = 1000 Hz, f0 = 60 Hz, Q = 30)
+NotchFilter ecgNotch(1000.0f, 60.0f, 30.0f);
+
+// ==========================================
+//             WIFI CREDENTIALS
+// ==========================================
+const char SSID[] = "YOUR_WIFI_SSID";
+const char PASS[] = "YOUR_WIFI_PASSWORD";
+
+WiFiConnectionHandler ArduinoIoTPreferredConnection(SSID, PASS);
+
+// ==========================================
+//          AD8232 (ECG) VARIABLES
+// ==========================================
+// Cloud Variables (ECG)
+int ecg_signal; 
+int bpm_value; 
+
+// --- TUNING DASHBOARD ---
+const int PRINT_SPEED = 50; 
+float THRESHOLD = 500.0; 
+const int MIN_TIME_BETWEEN_BEATS = 275;
+
+// --- CRITICAL FIX: RESTORE STABILITY ---
+const int BEATS_TO_AVERAGE = 15;
+
+const int PIN_LO_POS = 2; 
+const int PIN_LO_NEG = 3; 
+const int PIN_ECG    = A0; 
+
+float inByte = 0;
+int ecg_BPM = 0; 
+uint32_t beat_old = 0;
+uint32_t prevSampleSeq = 0;
+float beats[50]; 
+int beatIndex = 0;
+boolean belowThreshold = true;
+
+unsigned long lastPrintTime = 0;
+int peakValueInWindow = 0; 
+
+// ==========================================
+//       1 kHz HARDWARE TIMER & BUFFER
+// ==========================================
+FspTimer ecgTimer;
+const uint16_t ECG_BUFFER_SIZE = 512;
+const uint16_t ECG_BUFFER_MASK = ECG_BUFFER_SIZE - 1;
+volatile uint16_t ecgBuffer[ECG_BUFFER_SIZE];
+volatile uint32_t ecgSeqBuffer[ECG_BUFFER_SIZE];
+volatile uint16_t ecgHead = 0;
+volatile uint16_t ecgTail = 0;
+volatile uint32_t isrTickCounter = 0;
+
+void ecgTimerISR(timer_callback_args_t *p_args) {
+  (void)p_args;
+  uint32_t seq = ++isrTickCounter;
+  uint16_t sample = (uint16_t)analogRead(PIN_ECG);
+  uint16_t nextHead = (ecgHead + 1) &amp; ECG_BUFFER_MASK;
+  if (nextHead != ecgTail) {
+    ecgBuffer[ecgHead] = sample;
+    ecgSeqBuffer[ecgHead] = seq;
+    ecgHead = nextHead;
+  }
+}
+
+bool startEcgTimer(float freqHz) {
+  uint8_t timerType = GPT_TIMER;
+  int8_t timerChannel = FspTimer::get_available_timer(timerType);
+  if (timerChannel &lt; 0) {
+    timerType = AGT_TIMER;
+    timerChannel = FspTimer::get_available_timer(timerType);
+  }
+  if (timerChannel &lt; 0) return false;
+
+  if (!ecgTimer.begin(TIMER_MODE_PERIODIC, timerType, (uint8_t)timerChannel, freqHz, 0.0f, ecgTimerISR)) return false;
+  if (!ecgTimer.setup_overflow_irq(12)) return false;
+  if (!ecgTimer.open()) return false;
+  if (!ecgTimer.start()) return false;
+  return true;
+}
+
+// ==========================================
+//        MAX30102 (SPO2) VARIABLES
+// ==========================================
+// Cloud Variables (MAX)
+int cloudBPM;
+int cloudAvgBPM;
+int cloudSpO2;
+int cloudStatus;
+float cloudIR;
+int smoothingFactor = 5;
+bool cloudBeat = false;
+
+MAX30105 particleSensor;
+
+const float MAX_FIFO_RATE_HZ = 25.0f;
+const byte RATE_SIZE = 4; 
+byte rates[RATE_SIZE];
+byte rateSpot = 0;
+uint32_t maxSampleCounter = 0;
+uint32_t lastBeatSample = 0;
+float max_BPM; 
+int beatAvg;
+long irValue = 0;
+long redValue = 0;
+
+// SpO2 Buffers
+const int BUFFER_LENGTH = 100;
+uint32_t irBuffer[BUFFER_LENGTH];
+uint32_t redBuffer[BUFFER_LENGTH];
+int bufferIndex = 0;
+
+int32_t spo2 = 0;
+int8_t spo2Valid = 0;
+int32_t spo2HR = 0;
+int8_t spo2HRValid = 0;
+
+unsigned long lastCloudUpdate = 0;
+const unsigned long cloudInterval = 100;
+
+// ==========================================
+//           CLOUD SETUP
+// ==========================================
+void initProperties() {
+  ArduinoCloud.setThingId("c7dffcd2-d023-40e1-89c5-f99026f33736");
+
+  ArduinoCloud.addProperty(ecg_signal, READ, ON_CHANGE); 
+  ArduinoCloud.addProperty(bpm_value, READ, ON_CHANGE);   
+  ArduinoCloud.addProperty(cloudAvgBPM, READ, ON_CHANGE); 
+  ArduinoCloud.addProperty(cloudIR, READ, ON_CHANGE);     
+  ArduinoCloud.addProperty(cloudSpO2, READ, ON_CHANGE);   
+}
+
+// ==========================================
+//                SETUP
+// ==========================================
+void setup() {
+  Serial.begin(115200);
+  delay(1500);
+
+  // 1. Initialize Cloud
+  initProperties();
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  setDebugMessageLevel(0); 
+  
+  // 2. Hardware Setup: ECG Pins
+  pinMode(PIN_LO_POS, INPUT);
+  pinMode(PIN_LO_NEG, INPUT);
+  analogReadResolution(10); 
+  ecgNotch.reset((float)analogRead(PIN_ECG));
+
+  // 3. Hardware Setup: MAX30102
+  if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+    Serial.println("MAX30102 not found. Check wiring.");
+    while (1); 
+  }
+
+  // MAX30102 Settings (Low Power / High Speed)
+  byte ledBrightness = 0x1F; 
+  byte sampleAverage = 4;    
+  byte ledMode = 2;          
+  int sampleRate = 100;      
+  int pulseWidth = 411;      
+  int adcRange = 4096;       
+  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
+
+  // 4. Start 1 kHz Hardware Timer
+  if (!startEcgTimer(1000.0f)) {
+    Serial.println("ERROR: Failed to initialize 1 kHz hardware timer.");
+    while (1);
+  }
+
+  Serial.println("System Ready. 1 kHz Timer &amp; 60 Hz Notch Filter Active.");
+}
+
+// ==========================================
+//                  LOOP
+// ==========================================
+void loop() {
+  
+  // ==========================================
+  //      TASK 1: ECG LOGIC (Priority)
+  // ==========================================
+  uint8_t processed = 0;
+  while (ecgTail != ecgHead &amp;&amp; processed &lt; 64) {
+    uint16_t rawSample = ecgBuffer[ecgTail];
+    uint32_t sampleSeq = ecgSeqBuffer[ecgTail];
+    ecgTail = (ecgTail + 1) &amp; ECG_BUFFER_MASK;
+    processed++;
+
+    if (prevSampleSeq != 0 &amp;&amp; sampleSeq != (prevSampleSeq + 1)) {
+      ecgNotch.reset((float)rawSample);
+      belowThreshold = true;
+      beat_old = sampleSeq;
+    }
+    prevSampleSeq = sampleSeq;
+
+    if ((digitalRead(PIN_LO_POS) == 1) || (digitalRead(PIN_LO_NEG) == 1)) {
+      // Leads off
+      ecgNotch.reset(310.0f);
+      peakValueInWindow = 512; 
+      belowThreshold = true;
+      beatIndex = 0; 
+      ecg_BPM = 0;
+      
+      // Reset buffer
+      for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++) beats[i] = 0;
+      beat_old = sampleSeq; 
+    }
+    else {
+      // Process deterministic 1 kHz sample through 60 Hz IIR Biquad Notch Filter
+      inByte = ecgNotch.process((float)rawSample);
+      
+      // Peak Hold
+      if (inByte &gt; peakValueInWindow) {
+        peakValueInWindow = (int)inByte;
+      }
+      
+      // BPM Math
+      if (inByte &gt; THRESHOLD &amp;&amp; belowThreshold == true) {
+        calculateECGBPM(sampleSeq); 
+        belowThreshold = false;
+      }
+      else if (inByte &lt; THRESHOLD) {
+        belowThreshold = true; 
+      }
+    }
+  }
+
+  // ==========================================
+  //      TASK 2: MAX30102 LOGIC
+  // ==========================================
+  particleSensor.check();
+  while (particleSensor.available()) {
+    redValue = particleSensor.getFIFORed();
+    irValue  = particleSensor.getFIFOIR();
+    particleSensor.nextSample();
+    maxSampleCounter++;
+
+    if (irValue &gt; 50000) { 
+      irBuffer[bufferIndex]  = (uint32_t)irValue;
+      redBuffer[bufferIndex] = (uint32_t)redValue;
+      bufferIndex++;
+
+      if (bufferIndex &gt;= BUFFER_LENGTH) {
+        maxim_heart_rate_and_oxygen_saturation(
+          irBuffer, BUFFER_LENGTH, redBuffer,
+          &amp;spo2, &amp;spo2Valid, &amp;spo2HR, &amp;spo2HRValid
+        );
+        bufferIndex = 0;
+      }
+
+      if (checkForBeat(irValue) == true) {
+        uint32_t deltaSamples = maxSampleCounter - lastBeatSample;
+        lastBeatSample = maxSampleCounter;
+
+        if (deltaSamples &gt; 0) {
+          max_BPM = (60.0f * MAX_FIFO_RATE_HZ) / (float)deltaSamples;
+
+          if (max_BPM &lt; 255 &amp;&amp; max_BPM &gt; 20) {
+            rates[rateSpot++] = (byte)max_BPM;
+            rateSpot %= RATE_SIZE;
+            if (beatAvg &lt; 20) {
+               for (byte x = 0; x &lt; RATE_SIZE; x++) rates[x] = (byte)max_BPM;
+            }
+            long sum = 0;
+            for (byte x = 0; x &lt; RATE_SIZE; x++) sum += rates[x];
+            beatAvg = sum / RATE_SIZE;
+          }
+          cloudBeat = true;
+        }
+      }
+      if (cloudBeat &amp;&amp; (maxSampleCounter - lastBeatSample) &gt; 3) {
+        cloudBeat = false;
+      }
+    } 
+    else {
+      beatAvg = 0;
+      max_BPM = 0;
+      spo2 = 0;
+      spo2Valid = 0;
+      bufferIndex = 0;
+      lastBeatSample = maxSampleCounter;
+      for (byte x = 0; x &lt; RATE_SIZE; x++) rates[x] = 0;
+    }
+  }
+
+  // ==========================================
+  //      TASK 3: CLOUD & SERIAL UPDATES
+  // ==========================================
+  if (millis() - lastPrintTime &gt;= PRINT_SPEED) {
+    lastPrintTime = millis();
+    
+    // Update Variables
+    ecg_signal = peakValueInWindow;
+    bpm_value = ecg_BPM;
+    
+    cloudBPM = (int)max_BPM;
+    cloudAvgBPM = beatAvg;
+    cloudIR = irValue;
+    cloudSpO2 = (spo2Valid == 1) ? spo2 : 0;
+
+    // --- SERIAL PLOTTER ---
+    Serial.print("ECG:");
+    Serial.print(peakValueInWindow);      
+    Serial.print(",");
+    Serial.print("ECG_BPM:");
+    Serial.print(ecg_BPM);   
+    Serial.print(",");
+    Serial.print("MAX_IR:");
+    Serial.print(irValue);     
+    Serial.print(",");
+    Serial.print("MAX_BPM:");
+    Serial.println(beatAvg);  
+
+    peakValueInWindow = (int)inByte; 
+    
+    ArduinoCloud.update(); 
+  }
+}
+
+// ==========================================
+//          HELPER FUNCTIONS
+// ==========================================
+
+void calculateECGBPM (uint32_t beat_new) {  
+  if (beat_old == 0) {
+    beat_old = beat_new;
+    return;
+  }
+
+  uint32_t diff = beat_new - beat_old;
+  
+  if (diff &gt; MIN_TIME_BETWEEN_BEATS) {
+    float currentBPM = 60000.0f / (float)diff; 
+    
+    if (currentBPM &gt; 30 &amp;&amp; currentBPM &lt; 220) {
+      beats[beatIndex] = currentBPM; 
+      
+      if (ecg_BPM &lt; 20) {
+         for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++) beats[i] = currentBPM;
+      }
+      
+      float total = 0.0;
+      for (int i = 0; i &lt; BEATS_TO_AVERAGE; i++){
+        total += beats[i];
+      }
+      
+      ecg_BPM = int(total / BEATS_TO_AVERAGE);
+      beat_old = beat_new;
+      beatIndex = (beatIndex + 1) % BEATS_TO_AVERAGE; 
+    }
+    else if (diff &gt; 2500) { 
+       beat_old = beat_new;
+    }
+  }
+}</code></pre>
 
         <h3 id="videos">5. Videos</h3>
         <p>Live demonstrations of the ECG output before and after applying the DSP Notch Filter.</p>
