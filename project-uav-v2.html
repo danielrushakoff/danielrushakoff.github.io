@@ -75,13 +75,12 @@
         <p>I migrated the initial Arduino C++ testing code into Python for the Raspberry Pi 5. Below are the individual data acquisition scripts used to poll the environmental sensors during flight operations.</p>
 
         <h4 style="color: #FFA500;">BME280 (Temperature, Humidity, Pressure via I2C)</h4>
-        <pre class="code-block"><code>
-import time
+        <pre class="code-block"><code>import time
 import board
 from adafruit_bme280 import basic as adafruit_bme280
 
 # --- Configuration ---
-# Sea level pressure standard (matches your Arduino code)
+# Sea level pressure standard
 SEALEVELPRESSURE_HPA = 1013.25
 
 def setup():
@@ -143,8 +142,7 @@ if __name__ == "__main__":
 </code></pre>
 
         <h4 style="color: #FFA500;">MiCS-5524 (Gas Sensor via SPI/ADC)</h4>
-        <pre class="code-block"><code>
-import time
+        <pre class="code-block"><code>import time
 import math
 from gpiozero import DigitalOutputDevice, MCP3008
 
@@ -290,8 +288,7 @@ if __name__ == "__main__":
 </code></pre>
 
         <h4 style="color: #FFA500;">MQ-2 (Gas/Smoke Sensor via SPI/ADC)</h4>
-        <pre class="code-block"><code>
-import time
+        <pre class="code-block"><code>import time
 import math
 from gpiozero import MCP3008
 from RPLCD.gpio import CharLCD
@@ -323,7 +320,6 @@ GAS_SMOKE = 2
 
 # --- Curves ---
 # Format: {x, y, slope}
-# These match your Arduino definitions exactly
 LPGCurve = [2.3, 0.21, -0.47]
 COCurve = [2.3, 0.72, -0.34]
 SmokeCurve = [2.3, 0.53, -0.44]
@@ -338,7 +334,7 @@ def MQResistanceCalculation(raw_adc):
     Input: raw_adc (0.0 to 1.0 from gpiozero, which we scale to 0-1023 equivalent)
     Output: Sensor resistance
     """
-    # gpiozero returns 0.0 to 1.0. We map this to 0-1023 to match Arduino math.
+    # gpiozero returns 0.0 to 1.0. We map this to 0-1023.
     raw_val = raw_adc * 1023.0
     
     # Prevent division by zero if sensor is disconnected (reading 0)
